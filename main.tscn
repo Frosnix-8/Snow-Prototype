@@ -1,0 +1,45 @@
+[gd_scene format=3 uid="uid://bkbbcppiya82c"]
+
+[ext_resource type="PackedScene" uid="uid://bbilycy11qf2j" path="res://snow/snow prototype.tscn" id="1_ig7tw"]
+[ext_resource type="PackedScene" uid="uid://c4wev7nhqhbmo" path="res://debug character.tscn" id="2_0xm2m"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_7dm0k"]
+sky_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
+ground_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
+
+[sub_resource type="Sky" id="Sky_ig7tw"]
+sky_material = SubResource("ProceduralSkyMaterial_7dm0k")
+
+[sub_resource type="Environment" id="Environment_0xm2m"]
+background_mode = 2
+sky = SubResource("Sky_ig7tw")
+ssao_enabled = true
+sdfgi_enabled = true
+glow_enabled = true
+
+[sub_resource type="WorldBoundaryShape3D" id="WorldBoundaryShape3D_or73b"]
+
+[node name="MAin" type="Node3D" unique_id=1711138950]
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=813654618]
+transform = Transform3D(-0.8660254, -0.43301278, 0.25, 0, 0.49999997, 0.86602545, -0.50000006, 0.75, -0.43301266, 0, 0, 0)
+shadow_enabled = true
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=186353460]
+environment = SubResource("Environment_0xm2m")
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=1109330497]
+transform = Transform3D(1, 0, 0, 0, 0.87465984, 0.4847372, 0, -0.4847372, 0.87465984, 0, 3.2038226, 4.736644)
+
+[node name="snow prototype" parent="." unique_id=1617259352 instance=ExtResource("1_ig7tw")]
+debug_step = true
+debug_propagate_large_area = true
+
+[node name="StaticBody3D" type="StaticBody3D" parent="." unique_id=1905197410]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.038975835, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D" unique_id=871207189]
+shape = SubResource("WorldBoundaryShape3D_or73b")
+
+[node name="CharacterBody3D" parent="." unique_id=911457540 instance=ExtResource("2_0xm2m")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.0786433, 1.1193466, 0)
