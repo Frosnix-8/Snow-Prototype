@@ -4,13 +4,13 @@
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_83my3"]
 shader = ExtResource("1_yekp3")
-shader_parameter/stamp_radius = 0.5000000074506
-shader_parameter/stamp_depth = 0.30000000447036
+shader_parameter/stamp_radius = 0.60000000894072
+shader_parameter/stamp_depth = 0.5000000074506
 
 [sub_resource type="PlaceholderTexture2D" id="PlaceholderTexture2D_vcoss"]
 size = Vector2(21, 21)
 
-[node name="TextureRect" type="TextureRect" unique_id=95645194]
+[node name="SnowStamp" type="TextureRect" unique_id=95645194]
 material = SubResource("ShaderMaterial_83my3")
 anchors_preset = -1
 anchor_right = 0.018000001

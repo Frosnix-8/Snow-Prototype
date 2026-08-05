@@ -1,7 +1,7 @@
 extends Node3D
 class_name Snow_Tile
 const TEXTURE_RESOLUTION : int = 128
-const CPU_HEIGHTMAP_RESOLUTION : int = 64
+const CPU_HEIGHTMAP_RESOLUTION : int = 6
 const CPU_HEIGHTMAP_RESOLUTION_REDUCED : int = 9
 static var CPU_grid_thread : Thread = Thread.new()
 static var CPU_grid_thread_semaphore : Semaphore = Semaphore.new()
@@ -49,9 +49,10 @@ var ticks := 0
 #region CPU side snow height map
 var snow_map_CPU : PackedFloat32Array
 var snow_map_CPU_reduced : PackedFloat32Array
+@export var no_collision:bool = false
 @export var use_thread : bool = true
 var is_updating_collision := false
-@export var collision_update_ratio : int = 3
+@export var collision_update_ratio : int = 4
 var collisions_changed : bool = false
 
 
@@ -86,8 +87,8 @@ func _ready() -> void:
 	snow_tex_2.position = Vector2.ZERO
 	idle_timer.wait_time = bake_idle_time
 	
-	snow_mesh_material = snow_mesh.get_active_material(0).duplicate()
-	snow_mesh.set_surface_override_material(0, snow_mesh_material)
+	snow_mesh_material = snow_mesh.get_active_material(0)#.duplicate()
+	#snow_mesh.set_surface_override_material(0, snow_mesh_material)
 	#snow_mesh.set_instance_shader_parameter("snow_curve", snow_curve)
 	snow_mesh_material.set_shader_parameter("snow_tex", snow_viewport_1.get_texture())
 	snow_mesh_material.set_shader_parameter("max_height", snow_max_height)
@@ -98,6 +99,8 @@ func _ready() -> void:
 		set_process_unhandled_input(false)
 	if !debug_print:
 		set_physics_process(false)
+	if no_collision:
+		coliision.queue_free()
 func start_thread() -> void:
 	if thread_started:
 		return
@@ -169,7 +172,8 @@ func snow_compression_event(local_uv : Vector2, radius: float, depth: float = 1.
 	
 	var mat : ShaderMaterial = stamp.material
 	mat.set_shader_parameter("stamp_radius", radius)
-	mat.set_shader_parameter("stamp_depth", depth)
+
+	stamp.set_instance_shader_parameter("stamp_depth", depth)
 	check_event_count()
 	idle_timer.start()
 	update_viewport()
@@ -178,6 +182,8 @@ func snow_compression_event(local_uv : Vector2, radius: float, depth: float = 1.
 # Only iterate the grid cells that could plausibly fall inside falloff_radius,
 # instead of scanning the full 64x64 grid every footstep.
 func CPU_snow_compression_event(local_uv : Vector2, radius: float, depth : float) -> Error:
+	if no_collision:
+		return OK
 	var grid_res := CPU_HEIGHTMAP_RESOLUTION
 	var falloff_radius : float = radius * 0.3
 	collisions_changed = true
@@ -321,10 +327,16 @@ func world_to_tile_uv(world_position : Vector3) -> Vector2:
 	
 	return Vector2(u, v)
 
-func on_player_step(world_position: Vector3) -> void:
+func on_player_step(world_position: Vector3, collision_height : float = -999.0) -> void:
 	var local_uv : Vector2 = world_to_tile_uv(world_position)
-	snow_compression_event(local_uv, 0.5, 0.4)
-	CPU_snow_compression_event(local_uv, 0.5, 0.4)
+	var depth := 0.4
+	if collision_height != -999.0:
+		depth = clamp((1.0 -((collision_height - global_position.y)) / snow_max_height), 0.0, 1.0)
+		print("position of snow:",global_position.y)
+		printt("height of collider:",collision_height)
+	snow_compression_event(local_uv, 0.6, depth)
+	CPU_snow_compression_event(local_uv, 0.6, depth)
+	print("depth is ", depth)
 	return 
 
 func setup_snow(_target_height : float = 1.2) -> void:
@@ -390,15 +402,11 @@ static func downsample_max_pool(src: PackedFloat32Array, src_size: int, dst_size
 	return dst
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("ui_accept", true):
-		for x in range(1):
-			on_player_step(Vector3(randf_range(-3,3),0,randf_range(-3,3)))
+	if event.is_action_pressed("ui_accept"):
+
+		on_player_step(Vector3(randf_range(-3,3),0,randf_range(-3,3)))
 			
 		printt("there are", stamp_count, "stamps")
-	elif event.is_action_pressed("ui_down"):
-		bake_snow_compression_CPU(self)
-	elif event.is_action_pressed("ui_up"):
-		bake_snow_compression()
 	elif event.is_action_pressed("ui_left"):
 		update_collision()
 		

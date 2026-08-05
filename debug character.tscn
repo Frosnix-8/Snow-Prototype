@@ -6,7 +6,11 @@
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_or73b"]
 
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_x8p32"]
+
 [node name="CharacterBody3D" type="CharacterBody3D" unique_id=911457540]
+collision_layer = 3
+input_ray_pickable = false
 script = ExtResource("1_x8p32")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=496867338]
@@ -14,3 +18,23 @@ mesh = SubResource("CapsuleMesh_ii28r")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=887595502]
 shape = SubResource("CapsuleShape3D_or73b")
+
+[node name="RayCast3D" type="RayCast3D" parent="." unique_id=794266017]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1114403, 0)
+target_position = Vector3(0, -4, 0)
+collision_mask = 2
+
+[node name="Area3D" type="Area3D" parent="." unique_id=1977342919]
+collision_layer = 2
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Area3D" unique_id=66592632]
+shape = SubResource("CapsuleShape3D_x8p32")
+disabled = true
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=426081362]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, -0.4)
+fov = 104.1
+
+[connection signal="body_entered" from="Area3D" to="." method="_on_area_3d_body_entered"]
+[connection signal="body_exited" from="Area3D" to="." method="_on_area_3d_body_exited"]
