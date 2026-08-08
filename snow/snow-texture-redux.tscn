@@ -30,9 +30,9 @@ shader_parameter/detail_albedo_tex = ExtResource("3_qnrhi")
 shader_parameter/detail_scale = 2.5
 shader_parameter/detail_normal_strength = 0.15000000223518
 shader_parameter/detail_albedo_strength = 0.3
-shader_parameter/transmission_strength = 0.90000001341108
-shader_parameter/transmission_color = Color(0.75, 0.88, 1, 1)
-shader_parameter/transmission_distortion = 0.3
+shader_parameter/transmission_strength = 0.45000000670554
+shader_parameter/transmission_color = Color(0.8363439, 0.9203271, 0.9999997, 1)
+shader_parameter/transmission_distortion = 0.35000000521542
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_ii28r"]
 material = SubResource("ShaderMaterial_8iubp")
