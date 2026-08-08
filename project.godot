@@ -11,13 +11,14 @@ config_version=5
 [application]
 
 config/name="snow_prototype"
-run/main_scene="uid://bkbbcppiya82c"
+run/main_scene="uid://dw2bem4t82aw7"
 config/features=PackedStringArray("4.7", "Mobile")
 config/icon="res://icon.svg"
 
 [autoload]
 
 SnowSurfaceManager="*uid://y5tou42hvelt"
+SnowComputeManager="*uid://f2ykbk33cplf"
 
 [display]
 
@@ -59,7 +60,9 @@ b={
 [physics]
 
 3d/physics_engine="Jolt Physics"
+common/physics_interpolation=true
 
 [rendering]
 
 rendering_device/driver.windows="d3d12"
+occlusion_culling/use_occlusion_culling=true

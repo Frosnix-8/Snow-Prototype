@@ -1,0 +1,53 @@
+[gd_scene format=3 uid="uid://bdrudpjt2hjdt"]
+
+[sub_resource type="GDScript" id="GDScript_utp8o"]
+resource_name = "sheartest"
+script/source = "@tool
+extends StaticBody3D
+@export var correct : bool = true
+@export var x_axis_shear : float = 0.0:
+	set(value):
+		x_axis_shear = value
+		prepare_shear_transform()
+@export var z_axis_shear : float = 0.0:
+	set(value):
+		z_axis_shear = value
+		prepare_shear_transform()
+
+@onready var mesh := $MeshInstance3D
+@onready var collider : CollisionShape3D = $CollisionShape3D
+var grid : PackedFloat32Array = [0.0,0.0,0.0,0.0] 
+func _ready() -> void:
+	prepare_shear_transform()
+	shear_grid()
+	collider.shape.map_data = grid
+	global_position.y = 3.0 * (x_axis_shear + z_axis_shear)
+	
+func prepare_shear_transform() -> void:
+	var shear_basis := Basis.IDENTITY
+	shear_basis.x.y = x_axis_shear
+	shear_basis.z.y = z_axis_shear
+	printt(\"sheared by \", x_axis_shear, z_axis_shear)
+	basis = shear_basis
+
+func shear_grid() -> void:
+	grid[0] *= (x_axis_shear + z_axis_shear)
+	grid[1] *= (x_axis_shear + z_axis_shear)
+	grid[2] *= (x_axis_shear + z_axis_shear)
+	grid[3] *= (x_axis_shear + z_axis_shear)
+"
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_ii28r"]
+size = Vector2(6, 6)
+
+[sub_resource type="HeightMapShape3D" id="HeightMapShape3D_or73b"]
+
+[node name="MeshInstance3D" type="StaticBody3D" unique_id=1503314053]
+script = SubResource("GDScript_utp8o")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1146207963]
+mesh = SubResource("PlaneMesh_ii28r")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1873197568]
+transform = Transform3D(6, 0, 0, 0, 6, 0, 0, 0, 6, 0, 0, 0)
+shape = SubResource("HeightMapShape3D_or73b")

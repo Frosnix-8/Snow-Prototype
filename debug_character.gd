@@ -10,16 +10,25 @@ const HEIGHT : float = 2.0
 var did_not_move := false
 var ticks := 0
 var ticks_since_moved := 0
-
+var last_physics_frame := 0
+var dir : Vector3 = Vector3.ZERO
 func _ready() -> void:
 	Input.mouse_mode =Input.MOUSE_MODE_CAPTURED
 
+func _process(_delta: float) -> void:
+	#print("checking visual snow")
+	if Engine.get_physics_frames() != last_physics_frame:
+		print("skipped process frame due to physics frame")
+		return
+	check_for_snow(dir, true)
+	last_physics_frame = Engine.get_physics_frames()
 func _physics_process(delta: float) -> void:
+	last_physics_frame = Engine.get_physics_frames()
 	ticks += 1
 	ticks_since_moved += 1
-	if current_tile and ticks % 3 == 0:
-		#current_tile.on_player_step(snow_check.global_position)
-		print("deforming snow")
+	#if current_tile and ticks % 2 == 0:
+		##current_tile.on_player_step(snow_check.global_position)
+		#print("deforming snow")
 	
 	# Add the gravity.
 	if not is_on_floor() and !no_gravity:
@@ -41,9 +50,9 @@ func _physics_process(delta: float) -> void:
 	else:
 		velocity.x = move_toward(velocity.x, 0, SPEED)
 		velocity.z = move_toward(velocity.z, 0, SPEED)
-	
-	$RayCast3D.position = basis * direction  + Vector3(0.0,1.1,0.0)
-	if ticks % 3 == 0 and ticks_since_moved < 10:
+	dir = direction
+	$RayCast3D.position = basis.inverse() * direction  + Vector3(0.0,1.5,0.0)
+	if ticks % 1 == 0 and ticks_since_moved < 3:
 			if check_for_snow(direction):
 				print("hit snow")
 
@@ -52,24 +61,30 @@ func _physics_process(delta: float) -> void:
 	
 var current_tile : Snow_Tile
 
-func check_for_snow(direction : Vector3) -> bool:
+func check_for_snow(direction : Vector3, visual : bool = false) -> bool:
 	var collider :Node3D= snow_check_ray.get_collider()
 	if !collider :
 		return false
-	var potential = collider.get_parent()
+	var potential = collider
 	if potential is Snow_Tile:
-		print("potential is snow!")
-
-		potential.on_player_step(global_position + direction * 0.5, ((global_position.y - (HEIGHT / 2.0))))
+		#print("potential is snow!")
+		var pos :Vector3= global_position + direction * 0.5
+		var height: float = ((global_position.y - (HEIGHT / 2.0)))
+		potential.on_player_move(pos, height , visual)
+		var speed : int = roundi(velocity.length())
+		if ticks % (15 - speed) == 0 and velocity:
+			print("STEP")
+			var pair : float = int(ticks % (30 - speed * 2) == 0) * 2 - 1
+			potential.on_player_step(pos + (basis * Vector3(0.3 * sign(pair), -1.0, 0.0)), height, true)
 	return false
 
 func _on_area_3d_body_entered(body: Node3D) -> void:
-	var collider =body.get_parent()
+	var collider =body
 	if collider is Snow_Tile:
 		current_tile = collider
 
 func _on_area_3d_body_exited(body: Node3D) -> void:
-	var collider = body.get_parent()
+	var collider = body
 	if collider == current_tile:
 		current_tile = null
 

@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://bbilycy11qf2j"]
 
-[ext_resource type="Script" uid="uid://cbbw30ule5idi" path="res://snow/snow_tile_prototype.gd" id="1_hp2t0"]
+[ext_resource type="Script" uid="uid://c08muwtny8qmk" path="res://snow/snow_tile_atlas.gd" id="1_3lv7v"]
 [ext_resource type="Shader" uid="uid://c8do3d0xbyfl0" path="res://snow/snow.gdshader" id="2_3lv7v"]
 [ext_resource type="Texture2D" uid="uid://7501kxu043fo" path="res://snow/snow-compresion-curve-tex.tres" id="3_3lv7v"]
 
@@ -14,6 +14,7 @@ shader = ExtResource("2_3lv7v")
 shader_parameter/snow_tex = SubResource("ViewportTexture_3lv7v")
 shader_parameter/snow_curve_intensity = ExtResource("3_3lv7v")
 shader_parameter/max_height = 2.0
+shader_parameter/tile_scale = 0.0625
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_ii28r"]
 material = SubResource("ShaderMaterial_83my3")
@@ -35,7 +36,7 @@ colors = PackedColorArray(0.01, 0.01, 0.01, 1)
 gradient = SubResource("Gradient_7l2tk")
 
 [node name="snow prototype" type="Node3D" unique_id=1617259352]
-script = ExtResource("1_hp2t0")
+script = ExtResource("1_3lv7v")
 debug_step = true
 debug_print = true
 

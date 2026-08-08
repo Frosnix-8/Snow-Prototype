@@ -1,5 +1,5 @@
 extends Node3D
-class_name Snow_Tile
+class_name Snow_Tile_prototype
 const TEXTURE_RESOLUTION : int = 128
 const CPU_HEIGHTMAP_RESOLUTION : int = 64
 const CPU_HEIGHTMAP_RESOLUTION_REDUCED : int = 9

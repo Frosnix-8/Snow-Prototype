@@ -1,0 +1,415 @@
+extends Node3D
+##Small tile section. samples its snow from the SnowComputeShader singleton. 
+class_name Snow_Tile
+static var instance_count : int = 0
+const TEXTURE_RESOLUTION : int = 128
+const CPU_HEIGHTMAP_RESOLUTION : int = 64
+const CPU_HEIGHTMAP_RESOLUTION_REDUCED : int = 9
+static var CPU_grid_thread : Thread = Thread.new()
+static var CPU_grid_thread_semaphore : Semaphore = Semaphore.new()
+static var CPU_grid_thread_mutex : Mutex = Mutex.new()
+var CPU_grid_thread_mutex_instance:Mutex = Mutex.new()
+static var CPU_grid_thread_queue : Array[Dictionary] = []
+static var thread_started : bool = false
+signal thread_job_finished
+static var thread_finished : bool = false
+
+const SNOW_MAX_HEIGHT: float = 1.4
+@onready var snow_mesh     : MeshInstance3D = $SnowMesh
+@onready var snow_mesh_material : ShaderMaterial
+
+
+#@onready var snow_curve : CurveTexture = preload("res://snow/snow-compresion-curve-tex.tres")
+@onready var snow_tile : PackedScene = preload("res://snow/snow-texture-redux.tscn")
+@export_category("Debug")
+@export var debug_step := false
+@export var debug_print := false
+@export var debug_propagate_large_area := false
+
+
+const TILE_SIZE : float = 6.0
+var ticks := 0
+
+#region GPU atlas local coordinates
+var UV_position : Vector2
+const UV_RATIO := 0.0625
+#endregion
+
+#region CPU side snow height map
+@export_category("CPU")
+var snow_map_CPU : PackedFloat32Array
+var snow_map_CPU_reduced : PackedFloat32Array
+@export var no_collision:bool = false
+@export var use_thread : bool = true
+var is_updating_collision := false
+@export var collision_update_ratio : int = 4
+var collisions_changed : bool = true
+@onready var coliision := $HeightCollision
+
+static var _axis_indices: Array[Array] = [] # _axis_indices[dst_index] = Array[int] of src indices
+# Precomputed weight entry for one output cell along one axis.
+class AxisWeight:
+	var index: int
+	var weight: float
+	func _init(i: int, w: float) -> void:
+		index = i
+		weight = w
+
+#endregion
+@export_category("transform")
+@export var x_axis_shear : float = 0.0
+@export var z_axis_shear : float = 0.0
+##should the shear be compensated, that is, the tile is lifted an amount equal to the tile's size multiplied by the shear.
+@export var vertical_shear_correction : bool = false
+
+# Called when the node enters the scene tree for the first time.
+func _ready() -> void:
+	debug_propagate()
+	instance_count += 1
+	prepare_UV_local()
+	prepare_material_UV()
+	prepare_collisions()
+	
+	prepare_CPU_heightmaps()
+	prepare_shear_transform()
+	#start_thread()
+	#checks
+	if global_rotation != Vector3.ZERO:
+		no_collision = true
+	if !debug_step:
+		set_process_unhandled_input(false)
+	if no_collision:
+		push_warning("COLLISIONS DISABLED")
+	
+	
+
+func _physics_process(_delta: float) -> void:
+	ticks += 1
+	if ticks % collision_update_ratio == 0:
+		#print("gonna update now")
+		CPU_collision_update()
+
+## builds performance weights for the CPU heightmap dimensions, making it run faster. only needs to run once per game.
+static func prepare_axis_indices(src_size: int, dst_size: int) -> void:
+	_axis_indices.clear()
+	_axis_indices.resize(dst_size)
+	var _scale: float = float(src_size) / float(dst_size)
+
+	for dc in dst_size:
+		var x0: int = int(floor(dc * _scale))
+		var x1: int = int(ceil((dc + 1) * _scale))
+		var indices: Array[int] = []
+		for sx in range(x0, min(x1, src_size)):
+			indices.append(sx)
+		_axis_indices[dc] = indices
+
+#func start_thread() -> void:
+	#if thread_started:
+		#return
+	#CPU_grid_thread.start(_thread_process)
+	#thread_started = true
+
+##creates the shear.
+func prepare_shear_transform() -> void:
+	var shear_basis := Basis.IDENTITY
+	shear_basis.x.y = x_axis_shear
+	shear_basis.z.y = z_axis_shear
+	if debug_print and (x_axis_shear or z_axis_shear):
+		printt("sheared by ", x_axis_shear, z_axis_shear)
+	snow_mesh.basis = shear_basis
+	if vertical_shear_correction:
+		global_position.y += TILE_SIZE * 0.5 * (x_axis_shear + z_axis_shear)
+
+##prepares the index of the tile and its position within the snow atlas.
+func prepare_UV_local() -> void:
+	var index : Vector2i = Vector2i(int(global_position.x / 6 + 8), int(global_position.z / 6 + 8))
+	UV_position = index * UV_RATIO
+	if debug_print:
+		print("position is ", UV_position)
+		
+
+##prepares all CPU high and low heightmaps with proper resolution.
+func prepare_CPU_heightmaps() -> void:
+	snow_map_CPU.resize(CPU_HEIGHTMAP_RESOLUTION * CPU_HEIGHTMAP_RESOLUTION)
+	for x in snow_map_CPU.size():
+		snow_map_CPU[x] = SNOW_MAX_HEIGHT / coliision.scale.x
+	snow_map_CPU_reduced.resize(CPU_HEIGHTMAP_RESOLUTION_REDUCED*CPU_HEIGHTMAP_RESOLUTION_REDUCED)
+	prepare_axis_indices(CPU_HEIGHTMAP_RESOLUTION, CPU_HEIGHTMAP_RESOLUTION_REDUCED)
+	CPU_heightmap_create_low()
+
+##Makes unique UV for this tile's ID.
+func prepare_material_UV() -> void:
+	snow_mesh_material = snow_mesh.get_active_material(0)
+	snow_mesh_material.set_shader_parameter("snow_tex", SnowComputeManager.displayed_atlas_texture_wrapper)
+	snow_mesh_material.set_shader_parameter("max_height", SNOW_MAX_HEIGHT)
+	snow_mesh.set_instance_shader_parameter("UV_local_coordinates", UV_position)
+
+##Makes a unique heightmap for the tile
+func prepare_collisions() -> void:
+	var shape := HeightMapShape3D.new()
+	shape.map_depth = 9
+	shape.map_width = 9
+	coliision.shape = shape
+##Process used by the grid thread.
+#static func _thread_process() -> void:
+	#while !thread_finished:
+		#print("thread is awaiting a new semaphore post")
+		#CPU_grid_thread_semaphore.wait()
+		#CPU_grid_thread_mutex.lock()
+		#if !CPU_grid_thread_queue.front() or thread_finished:
+			#CPU_grid_thread_mutex.unlock()
+			#continue
+		#var current_job : Dictionary = CPU_grid_thread_queue.front()
+		#CPU_grid_thread_queue.pop_front()
+		#CPU_grid_thread_mutex.unlock()
+		#
+		#
+		#var job_owner : Snow_Tile = current_job[&"job_owner"]
+		#job_owner.CPU_grid_thread_mutex_instance.lock()
+		#prints.call_deferred("thread has received a job from", job_owner)
+		#var source_array : PackedFloat32Array = current_job[&"snow_map_CPU"]
+		#var final_array : PackedFloat32Array = current_job[&"snow_map_CPU_reduced"]
+		#
+		#
+		#
+		#final_array = downsample_max_pool(source_array, CPU_HEIGHTMAP_RESOLUTION, CPU_HEIGHTMAP_RESOLUTION_REDUCED) 
+		#job_owner.set_thread_safe(&"snow_map_CPU_reduced",final_array)
+		#
+		#print("thread has completed job.")
+		#
+		#job_owner.CPU_grid_thread_mutex_instance.unlock()
+		#job_owner.call_deferred_thread_group(&"emit_signal", &"thread_job_finished")
+	#
+	#print("thread is finished.")
+#
+#func _thread_finished() -> void:
+	#thread_job_finished.emit()
+	#
+
+
+##Simulates a circular snow event on the GPU.
+func GPU_snow_compression_event(local_uv : Vector2, radius: float, depth: float = 1.0) -> Error:
+	var atlas_uv : Vector2 = local_to_atlas_uv(local_uv)
+	var atlas_radius : float = radius * UV_RATIO
+	if debug_print:
+		print("requested a stamp to snow compute.")
+	SnowComputeManager.request_stamp(atlas_uv, atlas_radius, depth)
+	
+	return OK
+
+
+##Simulates a circular snow event on the CPU side. TODO: thread it
+func CPU_snow_compression_event(local_uv : Vector2, radius: float, depth : float) -> Error:
+	if no_collision:
+		return OK
+	var grid_res := CPU_HEIGHTMAP_RESOLUTION
+	var falloff_radius : float = radius * 0.3
+	collisions_changed = true
+	var center_x : float = local_uv.x * (grid_res - 1)
+	var center_y : float = local_uv.y * (grid_res - 1)
+	var cell_radius : float = falloff_radius * (grid_res - 1)
+
+	var min_x : int = max(0, int(floor(center_x - cell_radius)))
+	var max_x : int = min(grid_res - 1, int(ceil(center_x + cell_radius)))
+	var min_y : int = max(0, int(floor(center_y - cell_radius)))
+	var max_y : int = min(grid_res - 1, int(ceil(center_y + cell_radius)))
+
+	var full_height : float = SNOW_MAX_HEIGHT / coliision.scale.x
+
+	for gy in range(min_y, max_y + 1):
+		for gx in range(min_x, max_x + 1):
+			var grid_uv : Vector2 = Vector2(float(gx), float(gy)) / float(grid_res - 1)
+			var dist : float = grid_uv.distance_to(local_uv)
+			if dist < falloff_radius:
+				var influence : float = 1.0 - (dist / falloff_radius)
+				var idx : int = gy * grid_res + gx
+				# target_height: how tall the snow SHOULD be here given this stamp's depth,
+				# not a delta to subtract from whatever's currently there.
+				var target_height : float = clamp(full_height * (1.0 - depth * influence), 0.0, full_height)
+				snow_map_CPU[idx] = min(snow_map_CPU[idx], target_height)
+
+	CPU_heightmap_create_low_synchronous()
+	return OK
+
+##Generates a lower resolution heightmap for the collision system, synchronously.
+##Meant to be called only from the non-threaded path. Threaded version will be
+##a separate function once that system is rebuilt.
+func CPU_heightmap_create_low_synchronous() -> void:
+	snow_map_CPU_reduced = downsample_max_pool(snow_map_CPU, CPU_HEIGHTMAP_RESOLUTION, CPU_HEIGHTMAP_RESOLUTION_REDUCED)
+	snow_map_CPU_reduced = apply_shear_to_heightmap(snow_map_CPU_reduced)
+
+##Generates a lower resolution heightmap for the collision system.
+func CPU_heightmap_create_low() -> void:
+	if !use_thread:
+		CPU_heightmap_create_low_synchronous()
+		return
+	
+	while CPU_grid_thread_mutex.try_lock() == false:
+		if debug_print:
+			prints(self.name ,"is waiting for the work thread to finish.")
+		await thread_job_finished
+	CPU_grid_thread_queue.append({
+		&"snow_map_CPU" : snow_map_CPU,
+		&"snow_map_CPU_reduced" : snow_map_CPU_reduced,
+		&"CPU_HEIGHTMAP_RESOLUTION" : CPU_HEIGHTMAP_RESOLUTION,
+		&"CPU_HEIGHTMAP_RESOLUTION_REDUCED" : CPU_HEIGHTMAP_RESOLUTION_REDUCED,
+		&"job_owner" : self
+	})
+	CPU_grid_thread_mutex.unlock()
+	CPU_grid_thread_semaphore.post()
+	if debug_print:
+		prints("added a new threaded job from", self.name)
+
+
+##Pushes the current low-res heightmap into the collision shape.
+##Synchronous — assumes snow_map_CPU_reduced is already up to date
+##(i.e. CPU_create_low_res_heightmap_synchronous already ran this update cycle).
+func CPU_collision_update() -> void:
+	if !collisions_changed:
+		return
+	var heightmap : HeightMapShape3D = coliision.shape
+	heightmap.map_data = snow_map_CPU_reduced
+	if debug_print:
+		print("updated collisions")
+	collisions_changed = false
+
+##Converts the world coordinates into UV's for the specified tile.
+func world_to_tile_uv(world_position : Vector3) -> Vector2:
+	var local_pos: Vector3 = to_local(world_position)
+	var u : float = (local_pos.x / TILE_SIZE) + 0.5
+	var v : float = (local_pos.z / TILE_SIZE) + 0.5
+	
+	return Vector2(u, v)
+
+##returns the UV coordinates in the atlas's scope.
+func local_to_atlas_uv(local_UV : Vector2) -> Vector2:
+	return UV_position + (local_UV * UV_RATIO)
+
+##Calculates the shear vertical offset of any given LOCAL point of the tile.
+func apply_shear_to_heightmap(heightmap_reduced: PackedFloat32Array, shear_x: float = x_axis_shear, shear_z: float = z_axis_shear) -> PackedFloat32Array:
+	if debug_print:
+		print("applying shear")
+	var grid_res : int = CPU_HEIGHTMAP_RESOLUTION_REDUCED
+	var result : PackedFloat32Array = heightmap_reduced.duplicate()
+	#the collision is scaled down by 0.75 for better density. sorry!
+	var effective_tile_size : float = (TILE_SIZE) / 0.75
+
+	for gz in range(grid_res):
+		for gx in range(grid_res):
+			# convert grid index to local tile-space position, centered on the tile
+			var local_u : float = float(gx) / float(grid_res - 1) # 0 to 1
+			var local_v : float = float(gz) / float(grid_res - 1) # 0 to 1
+			var local_x : float = (local_u - 0.5) * effective_tile_size
+			var local_z : float = (local_v - 0.5) * effective_tile_size
+
+			var shear_offset : float = (shear_x * local_x) + (shear_z * local_z)
+
+			var idx : int = gz * grid_res + gx
+			result[idx] += shear_offset
+
+	return result
+
+##returns the height of a position on the tile adjusted according to shear.
+func shear_height_offset(location : Vector3) -> float:
+	return location.y + (x_axis_shear * location.x) + (z_axis_shear * location.z)
+
+func on_player_step(world_position: Vector3, collision_height : float = -999.0, visualonly : bool = false) -> void:
+	var local_uv : Vector2 = world_to_tile_uv(world_position)
+	var depth := 0.4
+	if collision_height != -999.0:
+		var sheared_height : float = shear_height_offset(Vector3(world_position.x, global_position.y, world_position.z))
+		#print("sheared height is ", sheared_height)
+		depth = clamp((1.0 -((collision_height - sheared_height)) / SNOW_MAX_HEIGHT), 0.0, 1.0)
+		#print("position of snow:",global_position.y)
+		#printt("height of collider:",collision_height)
+		
+	GPU_snow_compression_event(local_uv, 0.03, depth)
+	if !visualonly: CPU_snow_compression_event(local_uv, 0.3, depth)
+	#print("depth is ", depth)
+	return 
+
+func on_player_move(world_position: Vector3, collision_height : float = -999, visualonly : bool = false) -> void:
+	var local_uv : Vector2 = world_to_tile_uv(world_position)
+	var depth := 0.4
+	if collision_height != -999.0:
+		var sheared_height : float = shear_height_offset(Vector3(world_position.x, global_position.y, world_position.z))
+		#print("sheared height is ", sheared_height)
+		depth = clamp((1.0 -((collision_height - sheared_height)) / SNOW_MAX_HEIGHT), 0.0, 0.5)
+		#print("position of snow:",global_position.y)
+		#printt("height of collider:",collision_height)
+		
+	GPU_snow_compression_event(local_uv, 0.1, depth)
+	if !visualonly: CPU_snow_compression_event(local_uv, 0.6, depth)
+	#print("depth is ", depth)
+	return 
+## not mines
+
+
+
+
+# Runtime downsample — picks max value per output cell, no per-call float math.
+# src: PackedFloat32Array, flattened src_size x src_size grid, index = y * src_size + x
+# use_min: set true if your depressions are stored as negative values and you want
+#          the deepest point preserved instead of the highest peak
+static func downsample_max_pool(src: PackedFloat32Array, src_size: int, dst_size: int, use_min: bool = false) -> PackedFloat32Array:
+	# pass 1: rows
+	var pass1: PackedFloat32Array = PackedFloat32Array()
+	pass1.resize(src_size * dst_size)
+	for r in src_size:
+		var row_offset: int = r * src_size
+		var dst_offset: int = r * dst_size
+		for dc in dst_size:
+			var best: float = INF if use_min else -INF
+			for sx in _axis_indices[dc]:
+				var v: float = src[row_offset + sx]
+				if use_min:
+					best = min(best, v)
+				else:
+					best = max(best, v)
+			pass1[dst_offset + dc] = best
+
+	# pass 2: columns
+	var dst: PackedFloat32Array = PackedFloat32Array()
+	dst.resize(dst_size * dst_size)
+	for dr in dst_size:
+		for dc in dst_size:
+			var best: float = INF if use_min else -INF
+			for sy in _axis_indices[dr]:
+				var v: float = pass1[sy * dst_size + dc]
+				if use_min:
+					best = min(best, v)
+				else:
+					best = max(best, v)
+			dst[dr * dst_size + dc] = best
+	return dst
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_accept"):
+
+		on_player_step(Vector3(randf_range(-3,3),0,randf_range(-3,3)))
+			
+		
+	elif event.is_action_pressed("ui_left"):
+		CPU_collision_update()
+
+func _exit_tree() -> void:
+	CPU_grid_thread_semaphore.post()
+	thread_finished = true
+	CPU_grid_thread.wait_to_finish()
+
+##Creates a 96x96 meter region filled with snow. this is the current largest possible snow region available due to space constraints. 
+##Any bigger will cause UV boundary issues and not retain information.
+func debug_propagate() -> void:
+	if debug_propagate_large_area:
+		print("PROPAGATING INTO LARGE AREA")
+		var amount := 16
+		for x in range(amount):
+			for y in range(amount):
+				
+				await get_tree().physics_frame
+				var new_tile : Snow_Tile= snow_tile.instantiate()
+				new_tile.debug_propagate_large_area = false
+				new_tile.global_position = Vector3.ZERO + Vector3(x - float(amount)/2, 0, y - float(amount)/2) * TILE_SIZE
+				get_parent().add_child(new_tile)
+				if new_tile.global_position == self.global_position:
+					new_tile.queue_free()
