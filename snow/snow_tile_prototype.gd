@@ -1,7 +1,7 @@
 extends Node3D
 class_name Snow_Tile
 const TEXTURE_RESOLUTION : int = 128
-const CPU_HEIGHTMAP_RESOLUTION : int = 6
+const CPU_HEIGHTMAP_RESOLUTION : int = 64
 const CPU_HEIGHTMAP_RESOLUTION_REDUCED : int = 9
 static var CPU_grid_thread : Thread = Thread.new()
 static var CPU_grid_thread_semaphore : Semaphore = Semaphore.new()
