@@ -11,10 +11,15 @@ layout(local_size_x = 8, local_size_y = 8) in;
 
 layout(r8, binding = 0) uniform image2D snow_atlas;
 
+const uint OP_MAX_COMPRESS = 0;
+const uint OP_ACCUMULATE = 1;
+
 struct Stamp {
 	vec2 uv_center;
 	float radius;
 	float value;
+	uint operation;
+	uint _padding; //useless, but apparently this compute shader likes multiples of eight. 
 };
 
 layout(binding = 1, std430) restrict readonly buffer StampBuffer {
@@ -45,7 +50,12 @@ void main() {
 			float t = 1.0 - (dist / s.radius);
 			float falloff = smoothstep(0.0, 1.0, t);
 			float stamp_value = s.value * falloff;
-			result = max(result, stamp_value);
+			if (s.operation == OP_MAX_COMPRESS) {
+				result = max(result, stamp_value);
+			}
+			else if (s.operation == OP_ACCUMULATE){
+				result = max(result - stamp_value, 0.0);
+			}
 		}
 	}
 

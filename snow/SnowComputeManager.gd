@@ -17,6 +17,10 @@ var smoothing_pipeline : RID
 
 const ATLAS_RESOLUTION : int = 2048
 const SECT_RESOLUTION  : int = 128
+##Compression uses max blending.
+const OP_MAX_COMPRESS : int = 0
+##Snow addition uses Accumulative blending.
+const OP_ACCUMULATE : int = 1
 
 var pending_stamps: Array[Dictionary] = []
 
@@ -43,7 +47,7 @@ func _compile_smoothing_shader() -> void:
 	smoothing_pipeline = rd.compute_pipeline_create(smoothing_shader)
 
 ##Sets up the atlas texture as a black texture with a resolution specified by the constant above.
-func _create_atlas() -> void:
+func _create_atlas(initial_value : float = 0.0) -> void:
 	var fmt : RDTextureFormat = RDTextureFormat.new()
 	fmt.width = ATLAS_RESOLUTION
 	fmt.height = ATLAS_RESOLUTION
@@ -59,7 +63,7 @@ func _create_atlas() -> void:
 	
 	var initial_data := PackedByteArray()
 	initial_data.resize(ATLAS_RESOLUTION * ATLAS_RESOLUTION)
-	initial_data.fill(0)
+	initial_data.fill(int(initial_value * 255))
 	rd.texture_update(atlas_texture, 0, initial_data)
 	
 	atlas_texture_wrapper = Texture2DRD.new()
@@ -116,6 +120,7 @@ func _process(delta: float) -> void:
 	rd.compute_list_bind_uniform_set(list, uniform_set, 0)
 	rd.compute_list_set_push_constant(list, push_constant, push_constant.size())
 	#print("snow computer is dispatching the compute shader.")
+	@warning_ignore("integer_division")
 	rd.compute_list_dispatch(list, ATLAS_RESOLUTION / 8, ATLAS_RESOLUTION / 8, 1)
 	rd.compute_list_end()
 	
@@ -149,23 +154,27 @@ func _smooth_atlas_step(delta) -> void:
 	rd.compute_list_bind_compute_pipeline(list, smoothing_pipeline)
 	rd.compute_list_bind_uniform_set(list, uniform_set, 0)
 	rd.compute_list_set_push_constant(list, push_constant, push_constant.size())
+	@warning_ignore("integer_division")
 	rd.compute_list_dispatch(list, ATLAS_RESOLUTION / 8, ATLAS_RESOLUTION / 8, 1)
 	rd.compute_list_end()
 
 	rd.free_rid(uniform_set)
 	
 
-func request_stamp(atlas_uv : Vector2, radius_uv: float, value: float) -> void:
+func request_stamp(atlas_uv : Vector2, radius_uv: float, value: float, operation: int = OP_MAX_COMPRESS) -> void:
 	pending_stamps.append({
 		&"uv" : atlas_uv,
 		&"radius" : radius_uv,
 		&"value" : value,
+		&"operation" : operation
 	})
+	if operation == OP_ACCUMULATE:
+		print("for some reason we need to accumulate")
 	#print("snow computer received request for a stamp from snow.")
 	
 func _pack_stamps(stamps: Array[Dictionary]) -> PackedByteArray:
 	var bytes : PackedByteArray = PackedByteArray()
-	bytes.resize(stamps.size() * 16)
+	bytes.resize(stamps.size() * 24)
 	var offset : int = 0
 	for stamp: Dictionary in stamps:
 		var uv: Vector2 = stamp[&"uv"]
@@ -173,7 +182,10 @@ func _pack_stamps(stamps: Array[Dictionary]) -> PackedByteArray:
 		bytes.encode_float(offset + 4, uv.y)
 		bytes.encode_float(offset + 8, stamp[&"radius"])
 		bytes.encode_float(offset + 12, stamp[&"value"])
-		offset += 16
+		bytes.encode_u32(offset + 16, stamp[&"operation"])
+		bytes.encode_u32(offset + 20, 0) #padding lol
+		
+		offset += 24
 	#print("snow computer is packing stamps into a byte array.")
 	return bytes
 	

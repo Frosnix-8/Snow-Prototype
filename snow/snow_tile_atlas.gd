@@ -6,6 +6,7 @@ const TEXTURE_RESOLUTION : int = 128
 const CPU_HEIGHTMAP_RESOLUTION : int = 64
 const CPU_HEIGHTMAP_RESOLUTION_REDUCED : int = 13
 const CPU_HEIGHTMAP_SCALE : float = 0.5
+var CPU_workerthread_task_id : int = -1
 var CPU_grid_thread_mutex_instance_queue : Mutex = Mutex.new()
 var CPU_grid_thread_mutex_instance:Mutex = Mutex.new()
 static var CPU_grid_thread_queue : Array[Dictionary] = []
@@ -15,6 +16,11 @@ static var thread_finished : bool = false
 const SNOW_MAX_HEIGHT: float = 2.0
 @onready var snow_mesh     : MeshInstance3D = $SnowMesh
 @onready var snow_mesh_material : ShaderMaterial
+
+var mesh_high : PlaneMesh = preload("res://snow/snow meshes/high-quality-plane.tres")
+var mesh_med :  PlaneMesh = preload("res://snow/snow meshes/medium-quality-mesh.tres")
+var mesh_low :PlaneMesh = preload("res://snow/snow meshes/low-quality-mesh.tres")
+var mesh_lowst :  PlaneMesh = preload("res://snow/snow meshes/lowest-quality-mesh.tres")
 
 
 #@onready var snow_curve : CurveTexture = preload("res://snow/snow-compresion-curve-tex.tres")
@@ -69,10 +75,9 @@ func _ready() -> void:
 	prepare_UV_local()
 	prepare_material_UV()
 	prepare_collisions()
-	
 	prepare_CPU_heightmaps()
 	prepare_shear_transform()
-	#start_thread()
+	SnowSurfaceManager.register_tile(self)
 	#checks
 	if global_rotation != Vector3.ZERO:
 		no_collision = true
@@ -87,14 +92,17 @@ func _physics_process(_delta: float) -> void:
 	ticks += 1
 	if collisions_changed == true and queued_events.size() > 0 and !thread_started:
 		thread_started = true
-		WorkerThreadPool.add_task(CPU_workerthread_compute_pending_events.bind(self), false, "Threaded job for computing CPU shit")
+		CPU_workerthread_task_id = WorkerThreadPool.add_task(CPU_workerthread_compute_pending_events.bind(self), false, "Threaded job for computing CPU shit")
 	
 	if ticks % collision_update_ratio == 0 and collisions_changed == true:
 		#print("gonna update now")
 		if !use_thread:
 			CPU_heightmap_create_low_synchronous()
 		CPU_collision_update()
-
+	
+	if ticks % 2 == 0:
+		LOD_mesh_update()
+	
 ## builds performance weights for the CPU heightmap dimensions, making it run faster. only needs to run once per game.
 static func prepare_axis_indices(src_size: int, dst_size: int) -> void:
 	_axis_indices.clear()
@@ -157,22 +165,43 @@ func prepare_collisions() -> void:
 	shape.map_width = CPU_HEIGHTMAP_RESOLUTION_REDUCED
 	coliision.shape = shape
 
-
+var LOD: int = 0
+func LOD_mesh_update() -> void:
+	return
+	#more than 20m away
+	var distance: float = get_viewport().get_camera_3d().global_position.distance_squared_to(global_position)
+	if distance > 10000 and LOD != 3:
+		LOD = 3
+		snow_mesh.mesh = mesh_lowst
+		print("updated to LOD 3")
+	elif distance > 2500 and LOD != 2:
+		LOD = 2
+		snow_mesh.mesh = mesh_low
+		print("updated to LOD 2")
+	elif distance > 400 and LOD != 1:
+		LOD = 1
+		snow_mesh.mesh = mesh_med
+		print("updated to LOD 1")
+	elif LOD != 0:
+		LOD = 0
+		snow_mesh.mesh = mesh_high
+		print("updated to LOD 0")
+	
 ##Simulates a circular snow event on the GPU.
-func GPU_snow_compression_event(local_uv : Vector2, radius: float, depth: float = 1.0) -> Error:
+func GPU_snow_compression_event(local_uv : Vector2, radius: float, depth: float = 1.0, use_accumulate : bool = false) -> Error:
 	var atlas_uv : Vector2 = local_to_atlas_uv(local_uv)
 	var atlas_radius : float = radius * UV_RATIO
 	#if debug_print:
 		##print("requested a stamp to snow compute.")
-	SnowComputeManager.request_stamp(atlas_uv, atlas_radius, depth)
+	SnowComputeManager.request_stamp(atlas_uv, atlas_radius, depth, int(use_accumulate))
 	
 	return OK
 
 ##to be called by a worker thread.
 static func CPU_workerthread_compute_pending_events(user : Snow_Tile) -> void:
 
-	if user.debug_print:
-		print("main thread id: ", OS.get_main_thread_id(), " | this thread id: ", OS.get_thread_caller_id())
+	#if user.debug_print:
+		#print("main thread id: ", OS.get_main_thread_id(), " | this thread id: ", OS.get_thread_caller_id())
 	user.CPU_grid_thread_mutex_instance_queue.lock()
 	var q : Array[Dictionary] = user.queued_events.duplicate()
 	user.queued_events.clear()
@@ -182,7 +211,7 @@ static func CPU_workerthread_compute_pending_events(user : Snow_Tile) -> void:
 		user.CPU_snow_compression_event(x[&"local_uv"] as Vector2, x[&"radius"] as float, x[&"depth"] as float)
 	#then make everything shrink :3
 	var final_reduced : PackedFloat32Array = Snow_Tile.downsample_max_pool(user.snow_map_CPU, CPU_HEIGHTMAP_RESOLUTION,CPU_HEIGHTMAP_RESOLUTION_REDUCED)
-	
+	final_reduced = user.apply_shear_to_heightmap(final_reduced)
 	#finally, mutex and assign.
 	user.CPU_grid_thread_mutex_instance.lock()
 	user.snow_map_CPU_reduced = final_reduced
@@ -261,7 +290,21 @@ func CPU_heightmap_create_low(user :Snow_Tile) -> void:
 	user.snow_map_CPU_reduced = reduced
 	user.CPU_grid_thread_mutex_instance.unlock()
 	user.CPU_collision_update()
-
+##resets heightmaps to whatever. should be threaded if final.
+func TMP_CPU_heightmap_reset(value : float) -> void:
+	print("value is ", value)
+	value = (SNOW_MAX_HEIGHT/ CPU_HEIGHTMAP_SCALE) * (1.0 - value) * 1
+	print("calculated value is ", value)
+	if thread_started:
+		while WorkerThreadPool.is_task_completed(CPU_workerthread_task_id) == false:
+			await get_tree().physics_frame
+	collisions_changed = true
+	print("resetting CPU array")
+	snow_map_CPU.fill(value)
+	snow_map_CPU_reduced.fill(value)
+	#you need to do it right after.
+	CPU_collision_update()
+	
 ##Pushes the current low-res heightmap into the collision shape.
 ##Synchronous — assumes snow_map_CPU_reduced is already up to date
 ##(i.e. CPU_create_low_res_heightmap_synchronous already ran this update cycle).
@@ -291,8 +334,8 @@ func local_to_atlas_uv(local_UV : Vector2) -> Vector2:
 
 ##Calculates the shear vertical offset of any given LOCAL point of the tile.
 func apply_shear_to_heightmap(heightmap_reduced: PackedFloat32Array, shear_x: float = x_axis_shear, shear_z: float = z_axis_shear) -> PackedFloat32Array:
-	if debug_print:
-		print("applying shear")
+	#if debug_print:
+		#print("applying shear")
 	var grid_res : int = CPU_HEIGHTMAP_RESOLUTION_REDUCED
 	var result : PackedFloat32Array = heightmap_reduced.duplicate()
 	#the collision is scaled down by 0.75 for better density. sorry!
@@ -348,6 +391,12 @@ func on_player_move(world_position: Vector3, collision_height : float = -999, vi
 	return 
 ## not mines
 
+##only visual so far. adds snow isntead of removing.
+func on_accumulate_snow(world_position: Vector3, visualonly : bool = false) -> void:
+	var local_uv : Vector2 = world_to_tile_uv(world_position)
+	var depth := 0.3
+	GPU_snow_compression_event(local_uv, 0.11, 0.005, SnowComputeManager.OP_ACCUMULATE)
+
 
 
 
@@ -400,6 +449,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _exit_tree() -> void:
 	thread_finished = true
+	SnowSurfaceManager.remove_tile(self)
 
 
 ##Creates a 96x96 meter region filled with snow. this is the current largest possible snow region available due to space constraints. 
@@ -412,7 +462,9 @@ func debug_propagate() -> void:
 			for y in range(amount):
 				
 				await get_tree().physics_frame
+				
 				var new_tile : Snow_Tile= snow_tile.instantiate()
+				new_tile.debug_print = false
 				new_tile.debug_propagate_large_area = false
 				new_tile.global_position = Vector3.ZERO + Vector3(x - float(amount)/2, 0, y - float(amount)/2) * TILE_SIZE
 				get_parent().add_child(new_tile)

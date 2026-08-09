@@ -12,6 +12,7 @@ const SNOWMEDMULT : float = 0.5
 @onready var snow_height_ray: RayCast3D = $SnowHeightCheck
 @onready var snow_check : Area3D = $Area3D
 @export var no_gravity := false
+@export var have_accumulate_snow_for_some_reason_damn : bool = false
 var did_not_move := false
 var ticks := 0
 var ticks_since_moved := 0
@@ -78,9 +79,12 @@ func check_for_snow(direction : Vector3, visual : bool = false) -> bool:
 		#print("potential is snow!")
 		var pos :Vector3= global_position + direction * 0.3
 		var height: float = ((global_position.y - (1.0)))
-		potential.on_player_move(pos, height , visual)
+		if !have_accumulate_snow_for_some_reason_damn:
+			potential.on_player_move(pos, height , visual)
+		else:
+			potential.on_accumulate_snow(pos, true)
 		var speed : int = roundi(velocity.length())
-		if ticks % (15 - speed) == 0 and velocity:
+		if ticks % (15 - speed) == 0 and velocity and !have_accumulate_snow_for_some_reason_damn:
 			#print("STEP")
 			var pair : float = int(ticks % (30 - speed * 2) == 0) * 2 - 1
 			potential.on_player_step(pos + ($Pivot.basis * Vector3(0.3 * sign(pair), -1.0, 0.0)), height, false)
@@ -118,3 +122,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		$Pivot.rotation.y -= event.relative.x * 0.001
 	if event is InputEventMouse:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	if event.is_action_pressed("ui_down"):
+		var amount : float = 1.0 - float(int(have_accumulate_snow_for_some_reason_damn))
+		SnowSurfaceManager.reset_all_snow(amount)
+	if event.is_action_pressed("ui_up"):
+		have_accumulate_snow_for_some_reason_damn = !have_accumulate_snow_for_some_reason_damn

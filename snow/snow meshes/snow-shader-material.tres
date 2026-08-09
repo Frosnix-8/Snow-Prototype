@@ -1,0 +1,23 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://bcevsp0b8lo6k"]
+
+[ext_resource type="Shader" uid="uid://c8do3d0xbyfl0" path="res://snow/snow.gdshader" id="1_hy0ja"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_hy0ja")
+shader_parameter/max_height = 2.0
+shader_parameter/tile_scale = 0.0625
+shader_parameter/update_normal_on_vertex_displace = true
+shader_parameter/normal_blur_radius = 2.0
+shader_parameter/enable_POM = false
+shader_parameter/max_layers = 32
+shader_parameter/min_layers = 16
+shader_parameter/depth_scale = 0.005
+shader_parameter/detail_scale = 8.0
+shader_parameter/detail_normal_strength = 0.5
+shader_parameter/detail_albedo_strength = 0.3
+shader_parameter/ice_deep_color = Color(0.05, 0.25, 0.65, 1)
+shader_parameter/ice_shallow_color = Color(0.85, 0.95, 1, 1)
+shader_parameter/ice_tint_power = 1.5
+shader_parameter/ice_glow_color = Color(0.4, 0.75, 1, 1)
+shader_parameter/ice_glow_strength = 1.0
