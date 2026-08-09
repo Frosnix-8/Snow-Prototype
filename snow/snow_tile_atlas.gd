@@ -343,7 +343,7 @@ func on_player_move(world_position: Vector3, collision_height : float = -999, vi
 		#printt("height of collider:",collision_height)
 		
 	GPU_snow_compression_event(local_uv, 0.11, depth)
-	if !visualonly: CPU_stash_or_use_sce(local_uv, 0.8, depth * 1.1)
+	if !visualonly: CPU_stash_or_use_sce(local_uv, 0.75, depth * 1.1)
 	#print("depth is ", depth)
 	return 
 ## not mines
