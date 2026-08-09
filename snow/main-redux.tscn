@@ -2,7 +2,6 @@
 
 [ext_resource type="PackedScene" uid="uid://c4wev7nhqhbmo" path="res://debug character.tscn" id="1_y8ala"]
 [ext_resource type="PackedScene" uid="uid://1g2h8fl72xyg" path="res://snow/snow-texture-redux.tscn" id="2_spce3"]
-[ext_resource type="PackedScene" uid="uid://bdrudpjt2hjdt" path="res://snow/shear-referenc.tscn" id="3_spce3"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_7dm0k"]
 sky_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
@@ -41,12 +40,4 @@ debug_fill = false
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.0786433, 1.954421, 0)
 
 [node name="SnowTile" parent="." unique_id=761074471 instance=ExtResource("2_spce3")]
-
-[node name="MeshInstance3D" parent="." unique_id=1503314053 instance=ExtResource("3_spce3")]
-transform = Transform3D(1, 0, 0, 1, 1, 0, 0, 0, 1, 6.0152493, 3, 0)
-x_axis_shear = 1.0
-
-[node name="OmniLight3D" type="OmniLight3D" parent="." unique_id=1172871206]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 3)
-light_energy = 16.0
-omni_range = 6.3
+debug_propagate_large_area = true

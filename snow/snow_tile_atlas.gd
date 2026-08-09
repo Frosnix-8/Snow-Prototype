@@ -7,11 +7,10 @@ const CPU_HEIGHTMAP_RESOLUTION : int = 64
 const CPU_HEIGHTMAP_RESOLUTION_REDUCED : int = 9
 static var CPU_grid_thread : Thread = Thread.new()
 static var CPU_grid_thread_semaphore : Semaphore = Semaphore.new()
-static var CPU_grid_thread_mutex : Mutex = Mutex.new()
+var CPU_grid_thread_mutex_instance_queue : Mutex = Mutex.new()
 var CPU_grid_thread_mutex_instance:Mutex = Mutex.new()
 static var CPU_grid_thread_queue : Array[Dictionary] = []
-static var thread_started : bool = false
-signal thread_job_finished
+var thread_started : bool = false
 static var thread_finished : bool = false
 
 const SNOW_MAX_HEIGHT: float = 1.4
@@ -55,6 +54,8 @@ class AxisWeight:
 		index = i
 		weight = w
 
+var queued_events : Array[Dictionary] = []
+
 #endregion
 @export_category("transform")
 @export var x_axis_shear : float = 0.0
@@ -85,8 +86,13 @@ func _ready() -> void:
 
 func _physics_process(_delta: float) -> void:
 	ticks += 1
-	if ticks % collision_update_ratio == 0:
+	if collisions_changed == true and queued_events.size() > 0 and !thread_started:
+		thread_started = true
+		WorkerThreadPool.add_task(CPU_workerthread_compute_pending_events.bind(self), false, "Threaded job for computing CPU shit")
+	
+	if ticks % collision_update_ratio == 0 and collisions_changed == true:
 		#print("gonna update now")
+		CPU_heightmap_create_low_synchronous()
 		CPU_collision_update()
 
 ## builds performance weights for the CPU heightmap dimensions, making it run faster. only needs to run once per game.
@@ -135,7 +141,7 @@ func prepare_CPU_heightmaps() -> void:
 		snow_map_CPU[x] = SNOW_MAX_HEIGHT / coliision.scale.x
 	snow_map_CPU_reduced.resize(CPU_HEIGHTMAP_RESOLUTION_REDUCED*CPU_HEIGHTMAP_RESOLUTION_REDUCED)
 	prepare_axis_indices(CPU_HEIGHTMAP_RESOLUTION, CPU_HEIGHTMAP_RESOLUTION_REDUCED)
-	CPU_heightmap_create_low()
+	CPU_heightmap_create_low_synchronous()
 
 ##Makes unique UV for this tile's ID.
 func prepare_material_UV() -> void:
@@ -150,41 +156,6 @@ func prepare_collisions() -> void:
 	shape.map_depth = 9
 	shape.map_width = 9
 	coliision.shape = shape
-##Process used by the grid thread.
-#static func _thread_process() -> void:
-	#while !thread_finished:
-		#print("thread is awaiting a new semaphore post")
-		#CPU_grid_thread_semaphore.wait()
-		#CPU_grid_thread_mutex.lock()
-		#if !CPU_grid_thread_queue.front() or thread_finished:
-			#CPU_grid_thread_mutex.unlock()
-			#continue
-		#var current_job : Dictionary = CPU_grid_thread_queue.front()
-		#CPU_grid_thread_queue.pop_front()
-		#CPU_grid_thread_mutex.unlock()
-		#
-		#
-		#var job_owner : Snow_Tile = current_job[&"job_owner"]
-		#job_owner.CPU_grid_thread_mutex_instance.lock()
-		#prints.call_deferred("thread has received a job from", job_owner)
-		#var source_array : PackedFloat32Array = current_job[&"snow_map_CPU"]
-		#var final_array : PackedFloat32Array = current_job[&"snow_map_CPU_reduced"]
-		#
-		#
-		#
-		#final_array = downsample_max_pool(source_array, CPU_HEIGHTMAP_RESOLUTION, CPU_HEIGHTMAP_RESOLUTION_REDUCED) 
-		#job_owner.set_thread_safe(&"snow_map_CPU_reduced",final_array)
-		#
-		#print("thread has completed job.")
-		#
-		#job_owner.CPU_grid_thread_mutex_instance.unlock()
-		#job_owner.call_deferred_thread_group(&"emit_signal", &"thread_job_finished")
-	#
-	#print("thread is finished.")
-#
-#func _thread_finished() -> void:
-	#thread_job_finished.emit()
-	#
 
 
 ##Simulates a circular snow event on the GPU.
@@ -197,14 +168,57 @@ func GPU_snow_compression_event(local_uv : Vector2, radius: float, depth: float 
 	
 	return OK
 
+##to be called by a worker thread.
+static func CPU_workerthread_compute_pending_events(user : Snow_Tile) -> void:
+	var time : float
+	if user.debug_print:
+		print("main thread id: ", OS.get_main_thread_id(), " | this thread id: ", OS.get_thread_caller_id())
+		time = Time.get_ticks_usec()
+	user.CPU_grid_thread_mutex_instance_queue.lock()
+	var q : Array[Dictionary] = user.queued_events.duplicate()
+	user.queued_events.clear()
+	user.CPU_grid_thread_mutex_instance_queue.unlock()
+	#do all the silly CPU effects
+	for x in q:
+		user.CPU_snow_compression_event(x[&"local_uv"] as Vector2, x[&"radius"] as float, x[&"depth"] as float)
+	#then make everything shrink :3
+	var final_reduced : PackedFloat32Array = Snow_Tile.downsample_max_pool(user.snow_map_CPU, CPU_HEIGHTMAP_RESOLUTION,CPU_HEIGHTMAP_RESOLUTION_REDUCED)
+	
+	#finally, mutex and assign.
+	user.CPU_grid_thread_mutex_instance.lock()
+	user.snow_map_CPU_reduced = final_reduced
+	user.CPU_grid_thread_mutex_instance.unlock()
+	user.thread_started = false
+	if user.debug_print:
+		prints("compute time was ", (Time.get_ticks_usec() - time) / 1000.0, " milliseconds")
+func CPU_stash_or_use_sce(local_uv : Vector2, radius: float, depth : float) -> void:
+	if use_thread:
+		CPU_grid_thread_mutex_instance_queue.lock()
+		queued_events.append({
+			&"local_uv" : local_uv,
+			&"radius" : radius,
+			&"depth" : depth
+		})
+		collisions_changed = true
+		CPU_grid_thread_mutex_instance_queue.unlock()
 
-##Simulates a circular snow event on the CPU side. TODO: thread it
+	else:
+		CPU_snow_compression_event(local_uv, radius, depth)
+	
+##Simulates a circular snow event on the CPU side. When threaded, no muttexes are used since no fucking else
+## is going to write here.
 func CPU_snow_compression_event(local_uv : Vector2, radius: float, depth : float) -> Error:
 	if no_collision:
 		return OK
+	
+	if !use_thread:
+		collisions_changed = true
+	
+	
+	
 	var grid_res := CPU_HEIGHTMAP_RESOLUTION
 	var falloff_radius : float = radius * 0.3
-	collisions_changed = true
+	
 	var center_x : float = local_uv.x * (grid_res - 1)
 	var center_y : float = local_uv.y * (grid_res - 1)
 	var cell_radius : float = falloff_radius * (grid_res - 1)
@@ -213,8 +227,8 @@ func CPU_snow_compression_event(local_uv : Vector2, radius: float, depth : float
 	var max_x : int = min(grid_res - 1, int(ceil(center_x + cell_radius)))
 	var min_y : int = max(0, int(floor(center_y - cell_radius)))
 	var max_y : int = min(grid_res - 1, int(ceil(center_y + cell_radius)))
-
-	var full_height : float = SNOW_MAX_HEIGHT / coliision.scale.x
+	#reminder that 0.75 is the heightmap's scale. I'm too lazy to make a constant
+	var full_height : float = SNOW_MAX_HEIGHT / 0.75
 
 	for gy in range(min_y, max_y + 1):
 		for gx in range(min_x, max_x + 1):
@@ -228,38 +242,28 @@ func CPU_snow_compression_event(local_uv : Vector2, radius: float, depth : float
 				var target_height : float = clamp(full_height * (1.0 - depth * influence), 0.0, full_height)
 				snow_map_CPU[idx] = min(snow_map_CPU[idx], target_height)
 
-	CPU_heightmap_create_low_synchronous()
+
 	return OK
 
 ##Generates a lower resolution heightmap for the collision system, synchronously.
 ##Meant to be called only from the non-threaded path. Threaded version will be
 ##a separate function once that system is rebuilt.
 func CPU_heightmap_create_low_synchronous() -> void:
+	if collisions_changed == false:
+		return
 	snow_map_CPU_reduced = downsample_max_pool(snow_map_CPU, CPU_HEIGHTMAP_RESOLUTION, CPU_HEIGHTMAP_RESOLUTION_REDUCED)
 	snow_map_CPU_reduced = apply_shear_to_heightmap(snow_map_CPU_reduced)
 
 ##Generates a lower resolution heightmap for the collision system.
-func CPU_heightmap_create_low() -> void:
+func CPU_heightmap_create_low(user :Snow_Tile) -> void:
 	if !use_thread:
 		CPU_heightmap_create_low_synchronous()
 		return
-	
-	while CPU_grid_thread_mutex.try_lock() == false:
-		if debug_print:
-			prints(self.name ,"is waiting for the work thread to finish.")
-		await thread_job_finished
-	CPU_grid_thread_queue.append({
-		&"snow_map_CPU" : snow_map_CPU,
-		&"snow_map_CPU_reduced" : snow_map_CPU_reduced,
-		&"CPU_HEIGHTMAP_RESOLUTION" : CPU_HEIGHTMAP_RESOLUTION,
-		&"CPU_HEIGHTMAP_RESOLUTION_REDUCED" : CPU_HEIGHTMAP_RESOLUTION_REDUCED,
-		&"job_owner" : self
-	})
-	CPU_grid_thread_mutex.unlock()
-	CPU_grid_thread_semaphore.post()
-	if debug_print:
-		prints("added a new threaded job from", self.name)
-
+	var reduced : PackedFloat32Array = downsample_max_pool(user.snow_map_CPU, CPU_HEIGHTMAP_RESOLUTION, CPU_HEIGHTMAP_RESOLUTION_REDUCED)
+	user.CPU_grid_thread_mutex_instance.lock()
+	user.snow_map_CPU_reduced = reduced
+	user.CPU_grid_thread_mutex_instance.unlock()
+	user.CPU_collision_update()
 
 ##Pushes the current low-res heightmap into the collision shape.
 ##Synchronous — assumes snow_map_CPU_reduced is already up to date
@@ -268,7 +272,10 @@ func CPU_collision_update() -> void:
 	if !collisions_changed:
 		return
 	var heightmap : HeightMapShape3D = coliision.shape
+	if CPU_grid_thread_mutex_instance.try_lock() == false:
+		return #jfc just cancel if it's busy lol unlucky
 	heightmap.map_data = snow_map_CPU_reduced
+	CPU_grid_thread_mutex_instance.unlock()
 	if debug_print:
 		print("updated collisions")
 	collisions_changed = false
@@ -324,7 +331,7 @@ func on_player_step(world_position: Vector3, collision_height : float = -999.0, 
 		#printt("height of collider:",collision_height)
 		
 	GPU_snow_compression_event(local_uv, 0.03, depth)
-	if !visualonly: CPU_snow_compression_event(local_uv, 0.3, depth)
+	if !visualonly: CPU_stash_or_use_sce(local_uv, 0.3, depth)
 	#print("depth is ", depth)
 	return 
 
@@ -339,7 +346,7 @@ func on_player_move(world_position: Vector3, collision_height : float = -999, vi
 		#printt("height of collider:",collision_height)
 		
 	GPU_snow_compression_event(local_uv, 0.1, depth)
-	if !visualonly: CPU_snow_compression_event(local_uv, 0.6, depth)
+	if !visualonly: CPU_stash_or_use_sce(local_uv, 0.6, depth)
 	#print("depth is ", depth)
 	return 
 ## not mines
@@ -395,7 +402,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func _exit_tree() -> void:
 	CPU_grid_thread_semaphore.post()
 	thread_finished = true
-	CPU_grid_thread.wait_to_finish()
+
 
 ##Creates a 96x96 meter region filled with snow. this is the current largest possible snow region available due to space constraints. 
 ##Any bigger will cause UV boundary issues and not retain information.

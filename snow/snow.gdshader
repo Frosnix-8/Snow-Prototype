@@ -28,10 +28,12 @@ uniform float detail_scale : hint_range(1.0, 32.0, 0.5) = 8.0;
 uniform float detail_normal_strength : hint_range(0.0, 2.0, 0.05) = 0.5;
 uniform float detail_albedo_strength : hint_range(0.0, 1.0, 0.05) = 0.3;
 
-group_uniforms transmission;
-uniform float transmission_strength : hint_range(0.0, 3.0, 0.05) = 1.0;
-uniform vec3 transmission_color : source_color = vec3(0.75, 0.88, 1.0);
-uniform float transmission_distortion : hint_range(0.0, 1.0, 0.05) = 0.3;
+group_uniforms stylized_ice;
+uniform vec3 ice_deep_color : source_color = vec3(0.05, 0.25, 0.65);
+uniform vec3 ice_shallow_color : source_color = vec3(0.85, 0.95, 1.0);
+uniform float ice_tint_power : hint_range(0.5, 4.0, 0.1) = 1.5;
+uniform vec3 ice_glow_color : source_color = vec3(0.4, 0.75, 1.0);
+uniform float ice_glow_strength : hint_range(0.0, 3.0, 0.05) = 1.0;
 
 // Samples the heightmap at a UV and returns world-space-scale height,
 // using the same black=snow/white=compressed convention as everywhere else.
@@ -112,33 +114,24 @@ void vertex() {
 
 void fragment() {
 	vec2 UV_local = (UV * tile_scale) + UV_local_coordinates;
-	vec2 final_uv = UV_local;
 	
-	float snow_value = 1.0 - texture(snow_tex, final_uv).r;
+	float depth_factor = pow(1.0 - texture(snow_tex, UV_local).r, ice_tint_power);
+	vec3 ice_color = mix(ice_shallow_color, ice_deep_color, depth_factor);
+	
+	
 	
 	vec2 detail_uv = UV * detail_scale;
 	vec3 detail_normal = texture(detail_normal_tex, detail_uv).rgb * 2.0 - 1.0;
 	vec3 detail_albedo = texture(detail_albedo_tex, detail_uv).rgb;
-	
-	ALBEDO = mix(vec3(snow_value), vec3(snow_value) * detail_albedo, detail_albedo_strength);
 	NORMAL_MAP = detail_normal;
-	NORMAL_MAP_DEPTH = detail_normal_strength;
-}
-
-
-void light() {
-	vec2 UV_local = (UV * tile_scale) + UV_local_coordinates;
+	NORMAL_MAP_DEPTH = detail_normal_strength;NORMAL_MAP = detail_normal;
 	
-	float NdotL = dot(NORMAL, LIGHT);
-	vec3 diffuse = ALBEDO * clamp(NdotL, 0.0, 1.0) * ATTENUATION * LIGHT_COLOR / PI;
+	float rim_fresnel = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 4.0);
+	ALBEDO = mix(ice_color, ice_color * detail_albedo, detail_albedo_strength);
+	ALBEDO = mix(ALBEDO, vec3(1.0), rim_fresnel * 0.5);
 	
-	vec3 transmission_normal = normalize(NORMAL + LIGHT * transmission_distortion);
-	float transmission_dot = pow(clamp(dot(-VIEW, transmission_normal), 0.0, 1.0), 3.0);
+	float glow_fresnel = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 2.0);
+	EMISSION = ice_glow_color * glow_fresnel * ice_glow_strength * depth_factor;
 	
-	float thickness = texture(snow_tex, UV_local).r;
-	float transmission_amount = transmission_dot * thickness;
 	
-	vec3 transmission = transmission_color * transmission_amount * transmission_strength * LIGHT_COLOR / PI;
-	
-	DIFFUSE_LIGHT = diffuse + transmission;
 }

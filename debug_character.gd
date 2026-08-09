@@ -73,9 +73,9 @@ func check_for_snow(direction : Vector3, visual : bool = false) -> bool:
 		potential.on_player_move(pos, height , visual)
 		var speed : int = roundi(velocity.length())
 		if ticks % (15 - speed) == 0 and velocity:
-			print("STEP")
+			#print("STEP")
 			var pair : float = int(ticks % (30 - speed * 2) == 0) * 2 - 1
-			potential.on_player_step(pos + (basis * Vector3(0.3 * sign(pair), -1.0, 0.0)), height, true)
+			potential.on_player_step(pos + (basis * Vector3(0.3 * sign(pair), -1.0, 0.0)), height, false)
 	return false
 
 func _on_area_3d_body_entered(body: Node3D) -> void:
@@ -92,3 +92,5 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
 		$Camera3D.rotation.x -= event.relative.y * 0.001
 		rotation.y -= event.relative.x * 0.001
+	if event is InputEventMouse:
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
