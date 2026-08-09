@@ -2,9 +2,14 @@ extends CharacterBody3D
 
 
 const SPEED = 5.0
-const JUMP_VELOCITY = 4.5
+const JUMP_VELOCITY = 6.0
 const HEIGHT : float = 2.0
+const SNOWHIGH : float = 1.5
+const SNOWMED : float = 0.9
+const SNOWHIGHMULT : float = 0.2
+const SNOWMEDMULT : float = 0.5
 @onready var snow_check_ray : RayCast3D = $RayCast3D
+@onready var snow_height_ray: RayCast3D = $SnowHeightCheck
 @onready var snow_check : Area3D = $Area3D
 @export var no_gravity := false
 var did_not_move := false
@@ -41,23 +46,26 @@ func _physics_process(delta: float) -> void:
 	# Get the input direction and handle the movement/deceleration.
 	# As good practice, you should replace UI actions with custom gameplay actions.
 	var input_dir := Input.get_vector("l", "r", "f", "b")
-	var direction :Vector3= (basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
+	var direction :Vector3= ($Pivot.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
+	var processed_speed : float = SPEED * check_snow_height(direction)
 	if direction:
-		velocity.x = direction.x * SPEED
-		velocity.z = direction.z * SPEED
-		ticks_since_moved = 0
+		velocity.x = direction.x * processed_speed
+		velocity.z = direction.z * processed_speed
+	
+	
 		
 	else:
-		velocity.x = move_toward(velocity.x, 0, SPEED)
-		velocity.z = move_toward(velocity.z, 0, SPEED)
+		velocity.x = move_toward(velocity.x, 0, processed_speed)
+		velocity.z = move_toward(velocity.z, 0, processed_speed)
 	dir = direction
-	$RayCast3D.position = basis.inverse() * direction  + Vector3(0.0,1.5,0.0)
+	#$RayCast3D.position = basis.inverse() * direction  + Vector3(0.0,1.5,0.0)
 	if ticks % 1 == 0 and ticks_since_moved < 3:
 			if check_for_snow(direction):
 				print("hit snow")
 
 	move_and_slide()
-	
+	if velocity:
+		ticks_since_moved = 0
 	
 var current_tile : Snow_Tile
 
@@ -68,15 +76,31 @@ func check_for_snow(direction : Vector3, visual : bool = false) -> bool:
 	var potential = collider
 	if potential is Snow_Tile:
 		#print("potential is snow!")
-		var pos :Vector3= global_position + direction * 0.5
-		var height: float = ((global_position.y - (HEIGHT / 2.0)))
+		var pos :Vector3= global_position + direction * 0.3
+		var height: float = ((global_position.y - (1.0)))
 		potential.on_player_move(pos, height , visual)
 		var speed : int = roundi(velocity.length())
 		if ticks % (15 - speed) == 0 and velocity:
 			#print("STEP")
 			var pair : float = int(ticks % (30 - speed * 2) == 0) * 2 - 1
-			potential.on_player_step(pos + (basis * Vector3(0.3 * sign(pair), -1.0, 0.0)), height, false)
+			potential.on_player_step(pos + ($Pivot.basis * Vector3(0.3 * sign(pair), -1.0, 0.0)), height, false)
 	return false
+
+##runs by itself. Check height of snow.
+func check_snow_height(direction : Vector3) -> float:
+	if direction == Vector3.ZERO:
+		return 1.0
+	var dire :Vector3= direction * 0.78
+	snow_height_ray.position = Vector3(dire.x,1.5, dire.z)
+	var snow_position : Vector3 = snow_height_ray.get_collision_point()
+	var height : float = to_local(snow_position).y + 1.0
+	#print("height of snow is ", height)
+	if height > SNOWHIGH:
+		return SNOWHIGHMULT
+	elif height > SNOWMED:
+		return SNOWMEDMULT
+	return 1.0
+	
 
 func _on_area_3d_body_entered(body: Node3D) -> void:
 	var collider =body
@@ -90,7 +114,7 @@ func _on_area_3d_body_exited(body: Node3D) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
-		$Camera3D.rotation.x -= event.relative.y * 0.001
-		rotation.y -= event.relative.x * 0.001
+		$Pivot/Camera3D.rotation.x -= event.relative.y * 0.001
+		$Pivot.rotation.y -= event.relative.x * 0.001
 	if event is InputEventMouse:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED

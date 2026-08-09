@@ -4,9 +4,8 @@ class_name Snow_Tile
 static var instance_count : int = 0
 const TEXTURE_RESOLUTION : int = 128
 const CPU_HEIGHTMAP_RESOLUTION : int = 64
-const CPU_HEIGHTMAP_RESOLUTION_REDUCED : int = 9
-static var CPU_grid_thread : Thread = Thread.new()
-static var CPU_grid_thread_semaphore : Semaphore = Semaphore.new()
+const CPU_HEIGHTMAP_RESOLUTION_REDUCED : int = 13
+const CPU_HEIGHTMAP_SCALE : float = 0.5
 var CPU_grid_thread_mutex_instance_queue : Mutex = Mutex.new()
 var CPU_grid_thread_mutex_instance:Mutex = Mutex.new()
 static var CPU_grid_thread_queue : Array[Dictionary] = []
@@ -92,7 +91,8 @@ func _physics_process(_delta: float) -> void:
 	
 	if ticks % collision_update_ratio == 0 and collisions_changed == true:
 		#print("gonna update now")
-		CPU_heightmap_create_low_synchronous()
+		if !use_thread:
+			CPU_heightmap_create_low_synchronous()
 		CPU_collision_update()
 
 ## builds performance weights for the CPU heightmap dimensions, making it run faster. only needs to run once per game.
@@ -153,8 +153,8 @@ func prepare_material_UV() -> void:
 ##Makes a unique heightmap for the tile
 func prepare_collisions() -> void:
 	var shape := HeightMapShape3D.new()
-	shape.map_depth = 9
-	shape.map_width = 9
+	shape.map_depth = CPU_HEIGHTMAP_RESOLUTION_REDUCED
+	shape.map_width = CPU_HEIGHTMAP_RESOLUTION_REDUCED
 	coliision.shape = shape
 
 
@@ -162,18 +162,17 @@ func prepare_collisions() -> void:
 func GPU_snow_compression_event(local_uv : Vector2, radius: float, depth: float = 1.0) -> Error:
 	var atlas_uv : Vector2 = local_to_atlas_uv(local_uv)
 	var atlas_radius : float = radius * UV_RATIO
-	if debug_print:
-		print("requested a stamp to snow compute.")
+	#if debug_print:
+		##print("requested a stamp to snow compute.")
 	SnowComputeManager.request_stamp(atlas_uv, atlas_radius, depth)
 	
 	return OK
 
 ##to be called by a worker thread.
 static func CPU_workerthread_compute_pending_events(user : Snow_Tile) -> void:
-	var time : float
+
 	if user.debug_print:
 		print("main thread id: ", OS.get_main_thread_id(), " | this thread id: ", OS.get_thread_caller_id())
-		time = Time.get_ticks_usec()
 	user.CPU_grid_thread_mutex_instance_queue.lock()
 	var q : Array[Dictionary] = user.queued_events.duplicate()
 	user.queued_events.clear()
@@ -189,8 +188,6 @@ static func CPU_workerthread_compute_pending_events(user : Snow_Tile) -> void:
 	user.snow_map_CPU_reduced = final_reduced
 	user.CPU_grid_thread_mutex_instance.unlock()
 	user.thread_started = false
-	if user.debug_print:
-		prints("compute time was ", (Time.get_ticks_usec() - time) / 1000.0, " milliseconds")
 func CPU_stash_or_use_sce(local_uv : Vector2, radius: float, depth : float) -> void:
 	if use_thread:
 		CPU_grid_thread_mutex_instance_queue.lock()
@@ -228,7 +225,7 @@ func CPU_snow_compression_event(local_uv : Vector2, radius: float, depth : float
 	var min_y : int = max(0, int(floor(center_y - cell_radius)))
 	var max_y : int = min(grid_res - 1, int(ceil(center_y + cell_radius)))
 	#reminder that 0.75 is the heightmap's scale. I'm too lazy to make a constant
-	var full_height : float = SNOW_MAX_HEIGHT / 0.75
+	var full_height : float = SNOW_MAX_HEIGHT / CPU_HEIGHTMAP_SCALE
 
 	for gy in range(min_y, max_y + 1):
 		for gx in range(min_x, max_x + 1):
@@ -299,7 +296,7 @@ func apply_shear_to_heightmap(heightmap_reduced: PackedFloat32Array, shear_x: fl
 	var grid_res : int = CPU_HEIGHTMAP_RESOLUTION_REDUCED
 	var result : PackedFloat32Array = heightmap_reduced.duplicate()
 	#the collision is scaled down by 0.75 for better density. sorry!
-	var effective_tile_size : float = (TILE_SIZE) / 0.75
+	var effective_tile_size : float = (TILE_SIZE) / CPU_HEIGHTMAP_SCALE
 
 	for gz in range(grid_res):
 		for gx in range(grid_res):
@@ -345,8 +342,8 @@ func on_player_move(world_position: Vector3, collision_height : float = -999, vi
 		#print("position of snow:",global_position.y)
 		#printt("height of collider:",collision_height)
 		
-	GPU_snow_compression_event(local_uv, 0.1, depth)
-	if !visualonly: CPU_stash_or_use_sce(local_uv, 0.6, depth)
+	GPU_snow_compression_event(local_uv, 0.11, depth)
+	if !visualonly: CPU_stash_or_use_sce(local_uv, 0.8, depth * 1.1)
 	#print("depth is ", depth)
 	return 
 ## not mines
@@ -359,6 +356,8 @@ func on_player_move(world_position: Vector3, collision_height : float = -999, vi
 # use_min: set true if your depressions are stored as negative values and you want
 #          the deepest point preserved instead of the highest peak
 static func downsample_max_pool(src: PackedFloat32Array, src_size: int, dst_size: int, use_min: bool = false) -> PackedFloat32Array:
+	
+	#lprint("main thread id: ", OS.get_main_thread_id(), " | this thread id: ", OS.get_thread_caller_id())
 	# pass 1: rows
 	var pass1: PackedFloat32Array = PackedFloat32Array()
 	pass1.resize(src_size * dst_size)
@@ -400,7 +399,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		CPU_collision_update()
 
 func _exit_tree() -> void:
-	CPU_grid_thread_semaphore.post()
 	thread_finished = true
 
 

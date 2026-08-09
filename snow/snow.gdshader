@@ -1,5 +1,5 @@
 shader_type spatial;
-render_mode depth_draw_opaque, cull_disabled, specular_schlick_ggx; 
+render_mode depth_draw_opaque, cull_disabled, diffuse_lambert_wrap, specular_schlick_ggx; 
 
 uniform sampler2D snow_tex : source_color, filter_linear_mipmap_anisotropic, repeat_disable;
 uniform sampler2D snow_curve_intensity;

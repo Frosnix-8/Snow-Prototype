@@ -301,13 +301,13 @@ func bake_snow_compression() -> void:
 	
 
 ##Takes final image created by stamps, and bakes into a single image for performance.
-func bake_snow_compression_CPU(tile :Snow_Tile = self) -> void:
+func bake_snow_compression_CPU(tile :Snow_Tile_prototype = self) -> void:
 	await RenderingServer.frame_post_draw
 	var new_snow_tex : Image = active_viewport.get_viewport().get_texture().get_image()
 	var final_tex : Texture2D = ImageTexture.create_from_image(new_snow_tex)
 	_apply_snow_compression_CPU(tile, final_tex)
 
-func _apply_snow_compression_CPU(tile : Snow_Tile, image : Texture2D) -> void:
+func _apply_snow_compression_CPU(tile : Snow_Tile_prototype, image : Texture2D) -> void:
 	tile.active_tex.texture = image
 	print(tile.active_tex.texture)
 	print("reset successfully, removing stamps")
