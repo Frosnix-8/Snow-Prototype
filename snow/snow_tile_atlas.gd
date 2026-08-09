@@ -13,7 +13,7 @@ static var CPU_grid_thread_queue : Array[Dictionary] = []
 var thread_started : bool = false
 static var thread_finished : bool = false
 
-const SNOW_MAX_HEIGHT: float = 1.4
+const SNOW_MAX_HEIGHT: float = 2.0
 @onready var snow_mesh     : MeshInstance3D = $SnowMesh
 @onready var snow_mesh_material : ShaderMaterial
 
