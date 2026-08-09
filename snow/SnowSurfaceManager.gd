@@ -13,6 +13,7 @@ func remove_tile(tile : Snow_Tile) -> void:
 func reset_all_snow(height: float = 1.0) -> void:
 	print("resetting snow")
 	height = 1.0 - height
+	
 	SnowComputeManager._create_atlas(height)
 	for x in Tiles:
 		x.TMP_CPU_heightmap_reset(height)

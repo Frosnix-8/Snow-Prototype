@@ -51,21 +51,15 @@ map_data = PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 collision_layer = 2
 collision_mask = 2
 script = ExtResource("1_tbgtb")
-debug_step = null
 debug_print = true
-debug_propagate_large_area = null
-no_collision = null
-use_thread = null
-collision_update_ratio = 60
-x_axis_shear = null
-z_axis_shear = null
 vertical_shear_correction = true
 
 [node name="SnowMesh" type="MeshInstance3D" parent="." unique_id=539090830]
+transparency = 1.0
 extra_cull_margin = 0.4
 mesh = SubResource("PlaneMesh_ii28r")
 
 [node name="HeightCollision" type="CollisionShape3D" parent="." unique_id=1175581308]
 transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
 shape = SubResource("HeightMapShape3D_or73b")
-debug_fill = false
+debug_color = Color(0, 0.5950001, 0.7, 0.81960785)

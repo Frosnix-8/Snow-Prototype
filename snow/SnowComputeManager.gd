@@ -168,8 +168,8 @@ func request_stamp(atlas_uv : Vector2, radius_uv: float, value: float, operation
 		&"value" : value,
 		&"operation" : operation
 	})
-	if operation == OP_ACCUMULATE:
-		print("for some reason we need to accumulate")
+	#if operation == OP_ACCUMULATE:
+		#print("for some reason we need to accumulate")
 	#print("snow computer received request for a stamp from snow.")
 	
 func _pack_stamps(stamps: Array[Dictionary]) -> PackedByteArray:

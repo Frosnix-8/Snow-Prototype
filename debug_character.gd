@@ -105,25 +105,33 @@ func check_snow_height(direction : Vector3) -> float:
 		return SNOWMEDMULT
 	return 1.0
 	
-
-func _on_area_3d_body_entered(body: Node3D) -> void:
-	var collider =body
-	if collider is Snow_Tile:
-		current_tile = collider
-
-func _on_area_3d_body_exited(body: Node3D) -> void:
-	var collider = body
-	if collider == current_tile:
-		current_tile = null
+func check_nearby_tiles(main_tile : Snow_Tile, radius : float = 2.0) -> void:
+	var tiles : Array[Node3D] = snow_check.get_overlapping_bodies()
+	var total_tiles : int = 0
+	for t in tiles:
+		if t is not Snow_Tile:
+			
+			continue
+		total_tiles += 1
+		t.on_compression_event(global_position, 0.9, 10.0, Snow_Tile.eventmodes.logic)
+	print(total_tiles, " is the amount of affected tiles by the boom")
+func boom() -> void:
+	print("boom")
+	var snow : Snow_Tile = snow_check_ray.get_collider()
+	snow.on_compression_event(global_position, 0.9, 10.0, Snow_Tile.eventmodes.visual)
+	check_nearby_tiles(snow, 7.0)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
 		$Pivot/Camera3D.rotation.x -= event.relative.y * 0.001
 		$Pivot.rotation.y -= event.relative.x * 0.001
-	if event is InputEventMouse:
+	elif event is InputEventMouse:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-	if event.is_action_pressed("ui_down"):
+	elif event.is_action_pressed("ui_down"):
 		var amount : float = 1.0 - float(int(have_accumulate_snow_for_some_reason_damn))
 		SnowSurfaceManager.reset_all_snow(amount)
-	if event.is_action_pressed("ui_up"):
+	elif event.is_action_pressed("ui_up"):
 		have_accumulate_snow_for_some_reason_damn = !have_accumulate_snow_for_some_reason_damn
+	
+	elif event.is_action_pressed("ui_right"):
+		boom()

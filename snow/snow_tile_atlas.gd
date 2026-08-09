@@ -1,8 +1,14 @@
-extends Node3D
+extends StaticBody3D
 ##Small tile section. samples its snow from the SnowComputeShader singleton. 
 class_name Snow_Tile
+enum eventmodes {
+	normal, ##Event does both a visual and logical deformation of the snow.
+	visual, ##Event does a visual deformation of the snow.
+	logic   ##Event does a logical deformation of snow.
+}
 static var instance_count : int = 0
-const TEXTURE_RESOLUTION : int = 128
+const TILE_TEXTURE_RESOLUTION : int = 128
+const ATLAS_TEXTURE_RESOLUTION : int = 2048
 const CPU_HEIGHTMAP_RESOLUTION : int = 64
 const CPU_HEIGHTMAP_RESOLUTION_REDUCED : int = 13
 const CPU_HEIGHTMAP_SCALE : float = 0.5
@@ -36,7 +42,10 @@ var ticks := 0
 
 #region GPU atlas local coordinates
 var UV_position : Vector2
-const UV_RATIO := 0.0625
+const UV_RATIO := 0.0625 # 128 / 2048, ALERT not done real time for floating point precision reasons 
+const UV_REDUCTOR_RATIO := 0.5 / TILE_SIZE #infinite fraction, better done once.
+##Multiply by this constant the radius of an event for a proper size.
+const TO_ATLAS_UV_RADIUS_RATIO := UV_REDUCTOR_RATIO * UV_RATIO
 #endregion
 
 #region CPU side snow height map
@@ -49,6 +58,8 @@ var is_updating_collision := false
 @export var collision_update_ratio : int = 4
 var collisions_changed : bool = true
 @onready var coliision := $HeightCollision
+##set to true if something important must be updated.
+var CPU_important_update : bool = false
 
 static var _axis_indices: Array[Array] = [] # _axis_indices[dst_index] = Array[int] of src indices
 # Precomputed weight entry for one output cell along one axis.
@@ -90,16 +101,18 @@ func _ready() -> void:
 
 func _physics_process(_delta: float) -> void:
 	ticks += 1
-	if collisions_changed == true and queued_events.size() > 0 and !thread_started:
+	if (collisions_changed == true and queued_events.size() > 0 and !thread_started) or CPU_important_update:
 		thread_started = true
 		CPU_workerthread_task_id = WorkerThreadPool.add_task(CPU_workerthread_compute_pending_events.bind(self), false, "Threaded job for computing CPU shit")
-	
+		if CPU_important_update:
+			CPU_important_update = false
 	if ticks % collision_update_ratio == 0 and collisions_changed == true:
+		print("tile ", self.name, " is updating collisions")
 		#print("gonna update now")
 		if !use_thread:
 			CPU_heightmap_create_low_synchronous()
 		CPU_collision_update()
-	
+		
 	if ticks % 2 == 0:
 		LOD_mesh_update()
 	
@@ -190,7 +203,7 @@ func LOD_mesh_update() -> void:
 ##Simulates a circular snow event on the GPU.
 func GPU_snow_compression_event(local_uv : Vector2, radius: float, depth: float = 1.0, use_accumulate : bool = false) -> Error:
 	var atlas_uv : Vector2 = local_to_atlas_uv(local_uv)
-	var atlas_radius : float = radius * UV_RATIO
+	var atlas_radius : float = radius * TO_ATLAS_UV_RADIUS_RATIO
 	#if debug_print:
 		##print("requested a stamp to snow compute.")
 	SnowComputeManager.request_stamp(atlas_uv, atlas_radius, depth, int(use_accumulate))
@@ -217,6 +230,7 @@ static func CPU_workerthread_compute_pending_events(user : Snow_Tile) -> void:
 	user.snow_map_CPU_reduced = final_reduced
 	user.CPU_grid_thread_mutex_instance.unlock()
 	user.thread_started = false
+	user.collisions_changed = true
 func CPU_stash_or_use_sce(local_uv : Vector2, radius: float, depth : float) -> void:
 	if use_thread:
 		CPU_grid_thread_mutex_instance_queue.lock()
@@ -243,7 +257,7 @@ func CPU_snow_compression_event(local_uv : Vector2, radius: float, depth : float
 	
 	
 	var grid_res := CPU_HEIGHTMAP_RESOLUTION
-	var falloff_radius : float = radius * 0.3
+	var falloff_radius : float = radius * UV_REDUCTOR_RATIO * 1.5
 	
 	var center_x : float = local_uv.x * (grid_res - 1)
 	var center_y : float = local_uv.y * (grid_res - 1)
@@ -370,8 +384,8 @@ func on_player_step(world_position: Vector3, collision_height : float = -999.0, 
 		#print("position of snow:",global_position.y)
 		#printt("height of collider:",collision_height)
 		
-	GPU_snow_compression_event(local_uv, 0.03, depth)
-	if !visualonly: CPU_stash_or_use_sce(local_uv, 0.3, depth)
+	GPU_snow_compression_event(local_uv, 0.15, depth) #adjusted with the new proper sizing.
+	if !visualonly: CPU_stash_or_use_sce(local_uv, 0.15, depth)
 	#print("depth is ", depth)
 	return 
 
@@ -380,22 +394,38 @@ func on_player_move(world_position: Vector3, collision_height : float = -999, vi
 	var depth := 0.4
 	if collision_height != -999.0:
 		var sheared_height : float = shear_height_offset(Vector3(world_position.x, global_position.y, world_position.z))
-		#print("sheared height is ", sheared_height)
 		depth = clamp((1.0 -((collision_height - sheared_height)) / SNOW_MAX_HEIGHT), 0.0, 0.5)
-		#print("position of snow:",global_position.y)
-		#printt("height of collider:",collision_height)
+
 		
-	GPU_snow_compression_event(local_uv, 0.11, depth)
-	if !visualonly: CPU_stash_or_use_sce(local_uv, 0.75, depth * 1.1)
+	GPU_snow_compression_event(local_uv, 1.5, depth)
+	if !visualonly: CPU_stash_or_use_sce(local_uv, 1.5, depth * 1.1)
 	#print("depth is ", depth)
 	return 
-## not mines
+
 
 ##only visual so far. adds snow isntead of removing.
 func on_accumulate_snow(world_position: Vector3, visualonly : bool = false) -> void:
 	var local_uv : Vector2 = world_to_tile_uv(world_position)
-	var depth := 0.3
-	GPU_snow_compression_event(local_uv, 0.11, 0.005, SnowComputeManager.OP_ACCUMULATE)
+	var depth := 0.005
+	GPU_snow_compression_event(local_uv, 0.11, depth, SnowComputeManager.OP_ACCUMULATE)
+
+##Call this when you have just an "event" which doesn't select depth. instead, depth is derived from how high the event took place at.
+func on_compression_event_auto_depth(world_position : Vector3, collision_height : float, radius: float, mode : eventmodes= eventmodes.normal) -> void:
+	var depth : float
+	var sheared_height : float = shear_height_offset(Vector3(world_position.x, global_position.y, world_position.z))
+	depth = clamp((1.0 -((collision_height - sheared_height)) / SNOW_MAX_HEIGHT), 0.0, 1.0)
+	on_compression_event(world_position, depth, radius,mode)
+	#CPU_stash_or_use_sce(local_uv, )
+##Call this when you have an event, where depth is an exact value. a value of 1 means fully compressed snow.
+func on_compression_event(world_position: Vector3 , depth: float, radius : float, mode : eventmodes = eventmodes.normal) -> void:
+	var local_uv : Vector2 = world_to_tile_uv(world_position)
+	if mode == eventmodes.visual or mode == eventmodes.normal:
+		GPU_snow_compression_event(local_uv, radius, depth, false)
+	if mode == eventmodes.logic or mode == eventmodes.normal:
+		CPU_stash_or_use_sce(local_uv, radius, depth)
+	CPU_important_update = true
+	print("recorded a compression event.")
+	
 
 
 

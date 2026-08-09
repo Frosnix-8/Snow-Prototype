@@ -41,9 +41,4 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.0786433, 1.954421, 0)
 have_accumulate_snow_for_some_reason_damn = true
 
 [node name="SnowTile" parent="." unique_id=761074471 instance=ExtResource("2_spce3")]
-debug_step = false
 debug_propagate_large_area = true
-no_collision = false
-use_thread = true
-x_axis_shear = 0.0
-z_axis_shear = 0.0
