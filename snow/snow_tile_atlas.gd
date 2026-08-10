@@ -21,7 +21,7 @@ static var thread_finished : bool = false
 
 const SNOW_MAX_HEIGHT: float = 2.0
 @onready var snow_mesh     : MeshInstance3D = $SnowMesh
-@onready var snow_mesh_material : ShaderMaterial
+static var snow_mesh_material : ShaderMaterial = preload("res://snow/snow meshes/snow-shader-material.tres")
 
 var mesh_high : PlaneMesh = preload("res://snow/snow meshes/high-quality-plane.tres")
 var mesh_med :  PlaneMesh = preload("res://snow/snow meshes/medium-quality-mesh.tres")
@@ -61,6 +61,17 @@ var collisions_changed : bool = true
 ##set to true if something important must be updated.
 var CPU_important_update : bool = false
 
+#region LOD data
+const LOD_1_DIST : float = 7.5 * 7.5
+const LOD_2_DIST : float = 15.0 * 15.0
+const LOD_3_DIST : float = 38.0 * 38.0
+const LOD_4_DIST : float = 70.0 * 70.0
+var resolution_factor : float = 1.0
+const FHD_FACTOR : float = 1.0
+const QHD_FACTOR : float = 1.0 + 1.0/3.0
+const UHD_FACTOR : float = 2.0
+#endregion
+
 static var _axis_indices: Array[Array] = [] # _axis_indices[dst_index] = Array[int] of src indices
 # Precomputed weight entry for one output cell along one axis.
 class AxisWeight:
@@ -85,9 +96,11 @@ func _ready() -> void:
 	instance_count += 1
 	prepare_UV_local()
 	prepare_material_UV()
+	prepare_material_static()
 	prepare_collisions()
 	prepare_CPU_heightmaps()
 	prepare_shear_transform()
+	prepare_LOD_factor()
 	SnowSurfaceManager.register_tile(self)
 	#checks
 	if global_rotation != Vector3.ZERO:
@@ -97,8 +110,15 @@ func _ready() -> void:
 	if no_collision:
 		push_warning("COLLISIONS DISABLED")
 	
-	
-
+func prepare_LOD_factor() -> void:
+	var resolution : Vector2i = DisplayServer.window_get_size(0)
+	match resolution.y:
+		1080 or 1200:
+			resolution_factor = FHD_FACTOR
+		1440 or 1600:
+			resolution_factor = QHD_FACTOR
+		2160 or 2400:
+			resolution_factor = UHD_FACTOR
 func _physics_process(_delta: float) -> void:
 	ticks += 1
 	if (collisions_changed == true and queued_events.size() > 0 and !thread_started) or CPU_important_update:
@@ -166,11 +186,16 @@ func prepare_CPU_heightmaps() -> void:
 
 ##Makes unique UV for this tile's ID.
 func prepare_material_UV() -> void:
-	snow_mesh_material = snow_mesh.get_active_material(0)
-	snow_mesh_material.set_shader_parameter("snow_tex", SnowComputeManager.displayed_atlas_texture_wrapper)
-	snow_mesh_material.set_shader_parameter("max_height", SNOW_MAX_HEIGHT)
+	#NOTE: snow mesh material must be loaded prior.
+	snow_mesh.set_surface_override_material(0, snow_mesh_material)
 	snow_mesh.set_instance_shader_parameter("UV_local_coordinates", UV_position)
 
+static var material_setup : bool = false
+static func prepare_material_static() -> void:
+	if material_setup == false:
+		snow_mesh_material.set_shader_parameter("snow_tex", SnowComputeManager.displayed_atlas_texture_wrapper)
+		snow_mesh_material.set_shader_parameter("max_height", SNOW_MAX_HEIGHT)
+		material_setup = true
 ##Makes a unique heightmap for the tile
 func prepare_collisions() -> void:
 	var shape := HeightMapShape3D.new()
@@ -180,25 +205,29 @@ func prepare_collisions() -> void:
 
 var LOD: int = 0
 func LOD_mesh_update() -> void:
-	return
+	var _LOD : int
 	#more than 20m away
 	var distance: float = get_viewport().get_camera_3d().global_position.distance_squared_to(global_position)
-	if distance > 10000 and LOD != 3:
-		LOD = 3
-		snow_mesh.mesh = mesh_lowst
-		print("updated to LOD 3")
-	elif distance > 2500 and LOD != 2:
-		LOD = 2
-		snow_mesh.mesh = mesh_low
-		print("updated to LOD 2")
-	elif distance > 400 and LOD != 1:
-		LOD = 1
-		snow_mesh.mesh = mesh_med
-		print("updated to LOD 1")
-	elif LOD != 0:
-		LOD = 0
-		snow_mesh.mesh = mesh_high
-		print("updated to LOD 0")
+	if distance > LOD_3_DIST * resolution_factor:
+		_LOD = 3
+	elif distance > LOD_2_DIST * resolution_factor:
+		_LOD = 2
+	elif distance > LOD_1_DIST * resolution_factor:
+		_LOD = 1
+	else:
+		_LOD = 0
+	
+	if _LOD == LOD:
+		return
+	LOD = _LOD
+	var mesh : PlaneMesh
+	match LOD:
+		0: mesh = mesh_high
+		1: mesh = mesh_med
+		2: mesh = mesh_low
+		3: mesh = mesh_lowst
+	snow_mesh.mesh = mesh
+	snow_mesh.set_instance_shader_parameter("lod_level", LOD)
 	
 ##Simulates a circular snow event on the GPU.
 func GPU_snow_compression_event(local_uv : Vector2, radius: float, depth: float = 1.0, use_accumulate : bool = false) -> Error:

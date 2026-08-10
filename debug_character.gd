@@ -13,6 +13,7 @@ const SNOWMEDMULT : float = 0.5
 @onready var snow_check : Area3D = $Area3D
 @export var no_gravity := false
 @export var have_accumulate_snow_for_some_reason_damn : bool = false
+@export var debug_visual : Viewport.DebugDraw = Viewport.DEBUG_DRAW_DISABLED
 var did_not_move := false
 var ticks := 0
 var ticks_since_moved := 0
@@ -20,8 +21,9 @@ var last_physics_frame := 0
 var dir : Vector3 = Vector3.ZERO
 func _ready() -> void:
 	Input.mouse_mode =Input.MOUSE_MODE_CAPTURED
-
+	
 func _process(_delta: float) -> void:
+	get_viewport().debug_draw = debug_visual
 	#print("checking visual snow")
 	if Engine.get_physics_frames() != last_physics_frame:
 		print("skipped process frame due to physics frame")
@@ -118,6 +120,8 @@ func check_nearby_tiles(main_tile : Snow_Tile, radius : float = 2.0) -> void:
 func boom() -> void:
 	print("boom")
 	var snow : Snow_Tile = snow_check_ray.get_collider()
+	if !snow:
+		return
 	snow.on_compression_event(global_position, 0.9, 10.0, Snow_Tile.eventmodes.visual)
 	check_nearby_tiles(snow, 7.0)
 

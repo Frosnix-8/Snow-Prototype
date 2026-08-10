@@ -13,13 +13,25 @@ sky_material = SubResource("ProceduralSkyMaterial_7dm0k")
 [sub_resource type="Environment" id="Environment_0xm2m"]
 background_mode = 2
 sky = SubResource("Sky_ig7tw")
+ssao_enabled = true
+ssil_enabled = true
 
 [sub_resource type="WorldBoundaryShape3D" id="WorldBoundaryShape3D_or73b"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ii28r"]
+shading_mode = 2
+albedo_color = Color(0.36847892, 0.36847895, 0.36847892, 1)
+metallic = 0.37
+roughness = 0.62
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_or73b"]
+material = SubResource("StandardMaterial3D_ii28r")
+size = Vector2(120, 120)
 
 [node name="MAin" type="Node3D" unique_id=1711138950]
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=813654618]
-transform = Transform3D(-0.8660254, -0.43301275, 0.25, 0.15362841, 0.24537084, 0.957179, -0.47581345, 0.8673483, -0.1459743, 0, 0, 0)
+transform = Transform3D(-0.16507588, 0.07495258, 0.9834288, 0.8639164, 0.49202546, 0.107514724, -0.47581348, 0.8673483, -0.14597432, 0, 0, 0)
 shadow_enabled = true
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=186353460]
@@ -36,9 +48,12 @@ shape = SubResource("WorldBoundaryShape3D_or73b")
 debug_color = Color(0, 0.6, 0.69803923, 0)
 debug_fill = false
 
+[node name="MeshInstance3D" type="MeshInstance3D" parent="StaticBody3D" unique_id=1387613222]
+mesh = SubResource("PlaneMesh_or73b")
+
 [node name="CharacterBody3D" parent="." unique_id=911457540 instance=ExtResource("1_y8ala")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.0786433, 1.954421, 0)
-have_accumulate_snow_for_some_reason_damn = true
 
 [node name="SnowTile" parent="." unique_id=761074471 instance=ExtResource("2_spce3")]
+debug_print = false
 debug_propagate_large_area = true
