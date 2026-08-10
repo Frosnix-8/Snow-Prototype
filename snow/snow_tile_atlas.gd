@@ -70,6 +70,7 @@ var resolution_factor : float = 1.0
 const FHD_FACTOR : float = 1.0
 const QHD_FACTOR : float = 1.0 + 1.0/3.0
 const UHD_FACTOR : float = 2.0
+
 #endregion
 
 static var _axis_indices: Array[Array] = [] # _axis_indices[dst_index] = Array[int] of src indices

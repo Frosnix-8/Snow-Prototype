@@ -14,7 +14,6 @@ radius = 9.0
 collision_layer = 3
 input_ray_pickable = false
 script = ExtResource("1_x8p32")
-debug_visual = 3
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=496867338]
 mesh = SubResource("CapsuleMesh_ii28r")
