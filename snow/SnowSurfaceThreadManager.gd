@@ -1,6 +1,6 @@
 extends Node
-
-const NUM_THREADS := 6
+const MAX_THREADS : int = 3
+var NUM_THREADS : int = clampi(OS.get_processor_count(), 1, MAX_THREADS) 
 
 var threads : Array[Thread] = []
 var job_queue : Array[Snow_Tile] = []
@@ -13,6 +13,7 @@ func _init() -> void:
 		var t := Thread.new()
 		t.start(_worker_loop)
 		threads.append(t)
+	print("initiated SNOWSURFACETHREADMANAGER with ", NUM_THREADS, " threads.")
 
 func enqueue_tile(tile: Snow_Tile) -> void:
 	queue_mutex.lock()
