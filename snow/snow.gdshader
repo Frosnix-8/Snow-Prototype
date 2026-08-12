@@ -12,6 +12,7 @@ instance uniform int lod_level : hint_range(0, 6, 1) = 0;
 uniform float tile_scale = 0.0625 ;
 uniform bool update_normal_on_vertex_displace = true;
 
+
 group_uniforms normal_blur;
 uniform float normal_blur_radius : hint_range(1.0, 6.0, 0.1) = 2.0;
 uniform int blur_quality : hint_range(1, 4, 1) = 2; // taps per axis = 2*quality+1
@@ -27,9 +28,10 @@ uniform vec3 ice_deep_color : source_color = vec3(0.05, 0.25, 0.65);
 uniform vec3 ice_shallow_color : source_color = vec3(0.85, 0.95, 1.0);
 uniform float ice_tint_power : hint_range(0.5, 4.0, 0.1) = 1.5;
 uniform vec3 ice_glow_color : source_color = vec3(0.4, 0.75, 1.0);
+uniform float minimum_glow_strength : hint_range(0.0, 1.0, 0.05) = 0.2;
 uniform float ice_glow_strength : hint_range(0.0, 3.0, 0.05) = 1.0;
 uniform float ice_glow_sensitivity : hint_range(0.0, 10.0, 0.1) = 2.0;
-varying float ice_glow_sunlight_factor ;
+
 
 varying vec3 world_position;
 varying mat3 modelview_normal_matrix;
@@ -37,7 +39,7 @@ varying float strongest_attenuation;
 // Samples the heightmap at a UV and returns world-space-scale height,
 // using the same black=snow/white=compressed convention as everywhere else.
 float sample_snow_height(vec2 uv) {
-	return (1.0 - textureLod(snow_tex, uv, 0.0).r) * max_height;
+	return (1.0 - textureLod(snow_tex, uv, 3.0).r) * max_height;
 }
 
 float blur_1d(vec2 uv, vec2 direction, float texel_size) {
@@ -240,9 +242,10 @@ void fragment() {
 	ALBEDO = mix(ice_color, ice_color * detail_albedo, detail_albedo_strength);
 	ALBEDO = mix(ALBEDO, vec3(1.0), rim_fresnel * 0.5);
 
-	
+	float depth_reduction = (1.0 - depth);
+	depth_reduction = max(depth_reduction, 0.1); 
 	float glow_fresnel = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), ice_glow_sensitivity);
-	EMISSION = ice_glow_color * glow_fresnel * ice_glow_strength * depth_factor * pow(1.0 - depth, 2.0);
+	EMISSION = ice_glow_color * glow_fresnel * ice_glow_strength * depth_factor * depth_reduction;
 	strongest_attenuation = 0.0;
 	
 }

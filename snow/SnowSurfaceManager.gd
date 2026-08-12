@@ -35,13 +35,15 @@ func _input(event: InputEvent) -> void:
 
 func get_tiles_in_radius(world_position: Vector3, radius: float) -> Array[Snow_Tile]:
 	var result : Array[Snow_Tile] = []
-	radius *= 1.3 #padding
+	#radius *= 1.0 #padding
+	var half_size : float = Snow_Tile.TILE_SIZE * 0.5
+
 	for tile : Snow_Tile in Tiles:
-		var half_size : float = Snow_Tile.TILE_SIZE * 0.5
 		var closest_x : float = clampf(world_position.x, tile.global_position.x - half_size, tile.global_position.x + half_size)
 		var closest_z : float = clampf(world_position.z, tile.global_position.z - half_size, tile.global_position.z + half_size)
 		var dx : float = world_position.x - closest_x
 		var dz : float = world_position.z - closest_z
 		if (dx * dx + dz * dz) <= radius * radius:
 			result.append(tile)
+	print("there are ", result.size(), " tiles around the master.")
 	return result

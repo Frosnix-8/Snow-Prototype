@@ -28,7 +28,8 @@ func _process(_delta: float) -> void:
 	if Engine.get_physics_frames() != last_physics_frame:
 		print("skipped process frame due to physics frame")
 		return
-	check_for_snow(dir, true)
+		
+	if ticks_since_moved < 3: check_for_snow(dir, true)
 	last_physics_frame = Engine.get_physics_frames()
 func _physics_process(delta: float) -> void:
 	last_physics_frame = Engine.get_physics_frames()
@@ -84,7 +85,7 @@ func check_for_snow(direction : Vector3, visual : bool = false) -> bool:
 		if !have_accumulate_snow_for_some_reason_damn:
 			potential.on_player_move(pos, height , visual)
 		else:
-			potential.on_accumulate_snow(pos, true)
+			potential.on_accumulate_event(pos, 1.5, 0.5, false, false)
 		var speed : int = roundi(velocity.length())
 		if ticks % (15 - speed) == 0 and velocity and !have_accumulate_snow_for_some_reason_damn:
 			#print("STEP")
@@ -107,26 +108,28 @@ func check_snow_height(direction : Vector3) -> float:
 		return SNOWMEDMULT
 	return 1.0
 	
-func check_nearby_tiles(main_tile : Snow_Tile, radius : float = 2.0) -> void:
-	var tiles : Array[Node3D] = snow_check.get_overlapping_bodies()
-	var total_tiles : int = 0
-	for t in tiles:
-		if t is not Snow_Tile:
-			
-			continue
-		total_tiles += 1
-		t.on_compression_event(global_position, 0.9, 10.0, Snow_Tile.eventmodes.logic)
-	print(total_tiles, " is the amount of affected tiles by the boom")
 func boom() -> void:
 	print("boom")
 	var snow : Snow_Tile = snow_check_ray.get_collider()
 	if !snow:
 		return
-	snow.on_explosion(global_position, 10.0, 0.9)
-	#check_nearby_tiles(snow, 7.0)
+	if !have_accumulate_snow_for_some_reason_damn:
+		snow.on_explosion(global_position, 10.0, 0.9)
+	else:
+		snow.on_accumulative_exposion(global_position, 10.0, 0.9)
+
+func BFG() -> void:
+	print("BIG FUCKKING BOOM")
+	var snow : Snow_Tile = snow_check_ray.get_collider()
+	if !snow:
+		return
+	elif !have_accumulate_snow_for_some_reason_damn:
+		snow.on_explosion(global_position, 10.0, 2.0)
+	else:
+		snow.on_accumulate_event(global_position, 10.0, 1.0)
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventMouseMotion:
+	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		$Pivot/Camera3D.rotation.x -= event.relative.y * 0.001
 		$Pivot.rotation.y -= event.relative.x * 0.001
 	elif event is InputEventMouseButton:
@@ -141,3 +144,5 @@ func _unhandled_input(event: InputEvent) -> void:
 		boom()
 	elif event.is_action_pressed("ui_end"):
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	elif event.is_action_pressed("ui_left"):
+		BFG()
