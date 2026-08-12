@@ -96,7 +96,7 @@ func check_for_snow(direction : Vector3, visual : bool = false) -> bool:
 func check_snow_height(direction : Vector3) -> float:
 	if direction == Vector3.ZERO:
 		return 1.0
-	var dire :Vector3= direction * 0.78
+	var dire :Vector3= direction * 0.5
 	snow_height_ray.position = Vector3(dire.x,1.5, dire.z)
 	var snow_position : Vector3 = snow_height_ray.get_collision_point()
 	var height : float = to_local(snow_position).y + 1.0
@@ -122,14 +122,14 @@ func boom() -> void:
 	var snow : Snow_Tile = snow_check_ray.get_collider()
 	if !snow:
 		return
-	snow.on_compression_event(global_position, 0.9, 10.0, Snow_Tile.eventmodes.visual)
-	check_nearby_tiles(snow, 7.0)
+	snow.on_explosion(global_position, 10.0, 0.9)
+	#check_nearby_tiles(snow, 7.0)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
 		$Pivot/Camera3D.rotation.x -= event.relative.y * 0.001
 		$Pivot.rotation.y -= event.relative.x * 0.001
-	elif event is InputEventMouse:
+	elif event is InputEventMouseButton:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	elif event.is_action_pressed("ui_down"):
 		var amount : float = 1.0 - float(int(have_accumulate_snow_for_some_reason_damn))
@@ -139,3 +139,5 @@ func _unhandled_input(event: InputEvent) -> void:
 	
 	elif event.is_action_pressed("ui_right"):
 		boom()
+	elif event.is_action_pressed("ui_end"):
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE

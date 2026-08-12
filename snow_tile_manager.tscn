@@ -1,0 +1,56 @@
+[gd_scene format=3 uid="uid://dhk45s031mmyf"]
+
+[sub_resource type="GDScript" id="GDScript_spce3"]
+script/source = "@tool
+extends Node3D
+@export var scatter_snow : bool = false:
+	set(value):
+		scatter_snow = value
+		if scatter_snow == true:
+			assemble_snow()
+		elif scatter_snow == false:
+			dissassemble_snow()
+var snow_scattered : bool = false
+var snow_tile : PackedScene = preload(\"res://snow/snow-texture-redux.tscn\")
+
+const TILE_SIZE := 6.0
+const TILES_PER_SIDE := 16
+# Called when the node enters the scene tree for the first time.
+
+func _physics_process(_delta: float) -> void:
+	if Engine.is_editor_hint():
+		if scatter_snow and !snow_scattered:
+			assemble_snow()
+		elif !scatter_snow and snow_scattered:
+			dissassemble_snow()
+			
+func assemble_snow() -> void:
+	snow_scattered = true
+	for x in range(TILES_PER_SIDE):
+		for z in range(TILES_PER_SIDE):
+			var new_tile :Snow_Tile= snow_tile.instantiate()
+			new_tile.debug_step = false
+			new_tile.debug_print = false
+			new_tile.debug_propagate_large_area = false
+			new_tile.use_thread = true
+			new_tile.vertical_shear_correction = true
+			var _position := Vector3(
+				(x - 7.5) * TILE_SIZE,
+				0.0,
+				(z - 7.5) * TILE_SIZE
+			)
+			add_child(new_tile)
+			new_tile.global_position = _position
+			#await get_tree().process_frame
+	
+func dissassemble_snow() -> void:
+	snow_scattered = false
+	for x in get_children():
+		if x is Snow_Tile:
+			x.queue_free()
+	
+"
+
+[node name="SnowTileManager" type="Node3D" unique_id=1355251692]
+script = SubResource("GDScript_spce3")
+scatter_snow = true

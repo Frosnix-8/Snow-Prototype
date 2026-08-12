@@ -2,6 +2,7 @@
 
 [ext_resource type="PackedScene" uid="uid://c4wev7nhqhbmo" path="res://debug character.tscn" id="1_y8ala"]
 [ext_resource type="PackedScene" uid="uid://1g2h8fl72xyg" path="res://snow/snow-texture-redux.tscn" id="2_spce3"]
+[ext_resource type="PackedScene" uid="uid://d2gkrhf2nptwx" path="res://big cub.tscn" id="3_spce3"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_7dm0k"]
 sky_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
@@ -13,22 +14,28 @@ sky_material = SubResource("ProceduralSkyMaterial_7dm0k")
 [sub_resource type="Environment" id="Environment_0xm2m"]
 background_mode = 2
 sky = SubResource("Sky_ig7tw")
-ssao_enabled = true
-ssil_enabled = true
+tonemap_mode = 4
+glow_enabled = true
 
 [sub_resource type="WorldBoundaryShape3D" id="WorldBoundaryShape3D_or73b"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ii28r"]
-shading_mode = 2
 albedo_color = Color(0.36847892, 0.36847895, 0.36847892, 1)
 metallic = 0.37
-roughness = 0.62
+roughness = 0.45
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_or73b"]
 material = SubResource("StandardMaterial3D_ii28r")
-size = Vector2(120, 120)
+size = Vector2(96, 96)
 
 [node name="MAin" type="Node3D" unique_id=1711138950]
+
+[node name="SpotLight3D" type="SpotLight3D" parent="." unique_id=1231824593]
+transform = Transform3D(-0.36527315, 0.92574745, -0.0978122, 0.9289406, 0.36930087, 0.02619605, 0.060373057, -0.08129302, -0.99486005, 21.242418, 5.866832, -21.373161)
+light_energy = 16.0
+shadow_enabled = true
+spot_range = 89.712
+spot_angle = 29.82
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=813654618]
 transform = Transform3D(-0.16507588, 0.07495258, 0.9834288, 0.8639164, 0.49202546, 0.107514724, -0.47581348, 0.8673483, -0.14597432, 0, 0, 0)
@@ -52,8 +59,11 @@ debug_fill = false
 mesh = SubResource("PlaneMesh_or73b")
 
 [node name="CharacterBody3D" parent="." unique_id=911457540 instance=ExtResource("1_y8ala")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.0786433, 1.954421, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.52370214, 2.2850246, 5.6671014)
 
 [node name="SnowTile" parent="." unique_id=761074471 instance=ExtResource("2_spce3")]
-debug_print = false
 debug_propagate_large_area = true
+collision_update_ratio = 10
+
+[node name="MeshInstance3D" parent="." unique_id=1760380323 instance=ExtResource("3_spce3")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 29.18583, 2.4658203, 0)
