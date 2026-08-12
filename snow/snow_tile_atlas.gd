@@ -131,7 +131,7 @@ func _physics_process(_delta: float) -> void:
 			CPU_heightmap_create_low_synchronous()
 		CPU_collision_update()
 		
-	if ticks % 20 == 0:
+	if ticks % 15 == 0:
 		LOD_mesh_update()
 	
 ## builds performance weights for the CPU heightmap dimensions, making it run faster. only needs to run once per game.
