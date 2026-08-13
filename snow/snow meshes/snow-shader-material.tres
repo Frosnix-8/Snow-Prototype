@@ -4,17 +4,18 @@
 [ext_resource type="Texture2D" uid="uid://cdsgcn8so5t7f" path="res://snow/snow2kalbedo.png" id="2_uxq15"]
 [ext_resource type="Texture2D" uid="uid://c5uqidb3sq634" path="res://snow/snow2knormal.png" id="3_8td05"]
 
-[sub_resource type="Gradient" id="Gradient_16dr1"]
-offsets = PackedFloat32Array(0, 0.058643512)
+[sub_resource type="Gradient" id="Gradient_uxq15"]
+offsets = PackedFloat32Array(0, 0.93658537, 1)
+colors = PackedColorArray(0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 1, 1)
 
-[sub_resource type="GradientTexture1D" id="GradientTexture1D_x8p32"]
-gradient = SubResource("Gradient_16dr1")
-width = 128
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_uxq15"]
+gradient = SubResource("Gradient_uxq15")
+width = 1
 
 [resource]
 render_priority = 0
 shader = ExtResource("1_hy0ja")
-shader_parameter/snow_tex = SubResource("GradientTexture1D_x8p32")
+shader_parameter/snow_tex = SubResource("GradientTexture1D_uxq15")
 shader_parameter/max_height = 2.0
 shader_parameter/tile_scale = 0.0625
 shader_parameter/update_normal_on_vertex_displace = true
@@ -30,5 +31,6 @@ shader_parameter/ice_deep_color = Color(1, 1, 1, 1)
 shader_parameter/ice_shallow_color = Color(0.5482832, 0.59182554, 0.61160505, 1)
 shader_parameter/ice_tint_power = 2.0000000223518
 shader_parameter/ice_glow_color = Color(0.85051805, 0.94053984, 0.9999998, 1)
+shader_parameter/minimum_glow_strength = 0.2
 shader_parameter/ice_glow_strength = 0.35000000521542
 shader_parameter/ice_glow_sensitivity = 0.20000000298024

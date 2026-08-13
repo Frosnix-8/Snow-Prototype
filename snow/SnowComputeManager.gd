@@ -74,6 +74,7 @@ func _create_displayed_atlas() -> void:
 	fmt.width = ATLAS_RESOLUTION
 	fmt.height = ATLAS_RESOLUTION
 	fmt.format = RenderingDevice.DATA_FORMAT_R8_UNORM
+	#fmt.set_mipmaps(6)
 	fmt.usage_bits = (
 		RenderingDevice.TEXTURE_USAGE_STORAGE_BIT
 		| RenderingDevice.TEXTURE_USAGE_SAMPLING_BIT
@@ -85,6 +86,7 @@ func _create_displayed_atlas() -> void:
 	var initial_data := PackedByteArray()
 	initial_data.resize(ATLAS_RESOLUTION * ATLAS_RESOLUTION)
 	initial_data.fill(0)
+	
 	rd.texture_update(displayed_atlas_texture, 0, initial_data)
 
 	displayed_atlas_texture_wrapper = Texture2DRD.new()

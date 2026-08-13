@@ -56,6 +56,7 @@ debug_color = Color(0, 0.6, 0.69803923, 0)
 debug_fill = false
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="StaticBody3D" unique_id=1387613222]
+cast_shadow = 0
 mesh = SubResource("PlaneMesh_or73b")
 
 [node name="CharacterBody3D" parent="." unique_id=911457540 instance=ExtResource("1_y8ala")]

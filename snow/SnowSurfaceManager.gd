@@ -5,6 +5,7 @@ signal all_tiles_ready
 var Tiles : Array[Snow_Tile]
 var snow_mat : ShaderMaterial = preload("res://snow/snow meshes/snow-shader-material.tres")
 
+
 func register_tile(tile : Snow_Tile) -> void:
 	Tiles.append(tile)
 	all_tiles_ready.connect(tile._on_all_tiles_ready)
@@ -25,12 +26,12 @@ func announce_all_tiles_ready() -> void:
 	all_tiles_ready.emit()
 
 func _input(event: InputEvent) -> void:
-	if event.is_action_pressed("shinify"):
+	if event.is_action_pressed("shinify", true):
 		var n : float = snow_mat.get_shader_parameter("ice_glow_strength")
-		snow_mat.set_shader_parameter("ice_glow_strength", n + 0.05)
-	elif event.is_action_pressed("deshinify"):
+		snow_mat.set_shader_parameter("ice_glow_strength", n + 0.1)
+	elif event.is_action_pressed("deshinify", true):
 		var n : float = snow_mat.get_shader_parameter("ice_glow_strength")
-		snow_mat.set_shader_parameter("ice_glow_strength", max(n - 0.05, 0.0))
+		snow_mat.set_shader_parameter("ice_glow_strength", max(n - 0.1, 0.0))
 
 
 func get_tiles_in_radius(world_position: Vector3, radius: float) -> Array[Snow_Tile]:
@@ -47,3 +48,4 @@ func get_tiles_in_radius(world_position: Vector3, radius: float) -> Array[Snow_T
 			result.append(tile)
 	print("there are ", result.size(), " tiles around the master.")
 	return result
+	

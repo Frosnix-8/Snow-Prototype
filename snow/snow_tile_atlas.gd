@@ -24,6 +24,8 @@ var mesh_high : PlaneMesh = preload("res://snow/snow meshes/high-quality-plane.t
 var mesh_med :  PlaneMesh = preload("res://snow/snow meshes/medium-quality-mesh.tres")
 var mesh_low :PlaneMesh = preload("res://snow/snow meshes/low-quality-mesh.tres")
 var mesh_lowst :  PlaneMesh = preload("res://snow/snow meshes/lowest-quality-mesh.tres")
+var mesh_lowsp : PlaneMesh = preload("res://snow/snow meshes/lowestest-quality-mesh.tres")
+var mesh_lowmx : PlaneMesh = preload("res://snow/snow meshes/lowestestest-quality-mesh.tres")
 
 
 #@onready var snow_curve : CurveTexture = preload("res://snow/snow-compresion-curve-tex.tres")
@@ -61,10 +63,12 @@ var CPU_important_update : bool = false
 var snow_tile_neightbors : Array[Snow_Tile]
 
 #region LOD data
-const LOD_1_DIST : float = 7.5 * 7.5
-const LOD_2_DIST : float = 15.0 * 15.0
-const LOD_3_DIST : float = 38.0 * 38.0
-const LOD_4_DIST : float = 70.0 * 70.0
+const LOD_1_DIST : float = 8.0 * 8.0
+const LOD_2_DIST : float = 16.0 * 16.0
+const LOD_3_DIST : float = 32.0 * 32.0
+const LOD_4_DIST : float = 64.0 * 64.0
+const LOD_5_DIST : float = 128.0 * 128.0
+const LOD_6_DIST : float = 256.0 * 256.0
 var resolution_factor : float = 1.0
 const FHD_FACTOR : float = 1.0
 const QHD_FACTOR : float = 1.0 + 1.0/3.0
@@ -109,7 +113,8 @@ func _ready() -> void:
 
 func prepare_LOD_factor() -> void:
 	var resolution : Vector2i = DisplayServer.window_get_size(0)
-	match resolution.y:
+	var render_scale : float = get_viewport().scaling_3d_scale
+	match resolution.y * render_scale:
 		1080 or 1200:
 			resolution_factor = FHD_FACTOR
 			return
@@ -120,8 +125,10 @@ func prepare_LOD_factor() -> void:
 			resolution_factor = UHD_FACTOR
 			return
 		_:
-			var proportion_factor: float = resolution.y / 1080.0
-			resolution_factor = proportion_factor 
+			var proportion_factor: float = (resolution.y * render_scale) / 1080.0
+			resolution_factor = proportion_factor
+	
+	#resolution_factor *= resolution_factor
 		
 			
 func _physics_process(_delta: float) -> void:
@@ -232,7 +239,11 @@ func LOD_mesh_update() -> void:
 	if !cam:
 		return
 	var distance: float = cam.global_position.distance_squared_to(global_position)
-	if distance > LOD_3_DIST * resolution_factor:
+	if distance > LOD_5_DIST * resolution_factor:
+		_LOD = 5
+	elif distance > LOD_4_DIST * resolution_factor:
+		_LOD = 4
+	elif distance > LOD_3_DIST * resolution_factor:
 		_LOD = 3
 	elif distance > LOD_2_DIST * resolution_factor:
 		_LOD = 2
@@ -246,11 +257,16 @@ func LOD_mesh_update() -> void:
 	LOD = _LOD
 	var mesh : PlaneMesh
 	match LOD:
-		0: mesh = mesh_high
-		1: mesh = mesh_med
-		2: mesh = mesh_low
-		3: mesh = mesh_lowst
+		0: mesh = mesh_high #high density mesh for your usual stuff
+		1: mesh = mesh_med #medium density mesh when you get farther
+		2: mesh = mesh_low #low density mesh when you get far
+		3: mesh = mesh_lowst #lower lower density when you're really distant
+		4: mesh = mesh_lowsp #almost no quality when you're super far
+		5: mesh = mesh_lowmx  #no quality at all.
+		#most of the higher LOD values really only exist for low resolution, where having tiny LODs kinda matter when the pixelation makes that you 
+		#can't see more than 30 meters in HD.
 	snow_mesh.mesh = mesh
+	print("did some LOD stuff")
 	snow_mesh.set_instance_shader_parameter("lod_level", LOD)
 
 func GPU_snow_accumulation_event(local_uv : Vector2, radius: float, accumulation_intensity: float = 1.0) -> void:
@@ -323,7 +339,7 @@ func CPU_queue_event(local_uv : Vector2, radius: float, depth : float, global_po
 		return
 	
 	if exceeds_current_tile(radius, local_uv):
-		print("tile needs propagation")
+		#print("tile needs propagation")
 		for x : Snow_Tile in snow_tile_neightbors:
 			#print("this tile has ", snow_tile_neightbors.size(), " neighbors")
 			x._on_neightbor_request_compression(global_pos, depth, radius ,accumulate)
@@ -333,7 +349,7 @@ func CPU_queue_event(local_uv : Vector2, radius: float, depth : float, global_po
 func CPU_neighbor_queue_event(local_uv : Vector2, radius: float, depth : float, global_pos : Vector3, accumulate : bool) -> void:
 	#printt("neighbor is computing compression.", local_uv, radius, depth, global_pos, true, accumulate)
 	CPU_queue_event(local_uv, radius, depth * 1.6, global_pos, true, accumulate) # depth is exaggerated because imprecision makes neighboring tiles have weaker compute.
-	print("prepared neighbor event successfully")
+	#print("prepared neighbor event successfully")
 ##Simulates a circular snow event on the CPU side. Set accumulate to true to simulate snow accumulation. TODO: mutex when forcing a snow state change via debugs.
 func CPU_snow_compression_event(local_uv : Vector2, radius: float, depth : float, accumulate : bool = false) -> Rect2i:
 	if no_collision:
@@ -682,12 +698,14 @@ func debug_propagate() -> void:
 				var new_pos : Vector3 = Vector3.ZERO + Vector3(x - float(amount)/2, 0, y - float(amount)/2) * TILE_SIZE
 				if self.global_position == new_pos:
 					continue
-				await get_tree().process_frame
+				#await get_tree().process_frame
 				var new_tile : Snow_Tile= snow_tile.instantiate()
 				new_tile.debug_print = false
 				new_tile.debug_propagate_large_area = false
+				get_parent().add_child.call_deferred(new_tile)
 				new_tile.global_position = new_pos
-				get_parent().add_child(new_tile)
-		
+
+		await get_tree().physics_frame
+		await get_tree().physics_frame
 		await get_tree().physics_frame
 		SnowSurfaceManager.announce_all_tiles_ready()

@@ -10,7 +10,6 @@ const SNOWHIGHMULT : float = 0.2
 const SNOWMEDMULT : float = 0.5
 @onready var snow_check_ray : RayCast3D = $RayCast3D
 @onready var snow_height_ray: RayCast3D = $SnowHeightCheck
-@onready var snow_check : Area3D = $Area3D
 @export var no_gravity := false
 @export var have_accumulate_snow_for_some_reason_damn : bool = false
 @export var debug_visual : Viewport.DebugDraw = Viewport.DEBUG_DRAW_DISABLED
@@ -100,6 +99,8 @@ func check_snow_height(direction : Vector3) -> float:
 	var dire :Vector3= direction * 0.5
 	snow_height_ray.position = Vector3(dire.x,1.5, dire.z)
 	var snow_position : Vector3 = snow_height_ray.get_collision_point()
+	if !snow_height_ray.get_collider():
+		return 1.0
 	var height : float = to_local(snow_position).y + 1.0
 	#print("height of snow is ", height)
 	if height > SNOWHIGH:
