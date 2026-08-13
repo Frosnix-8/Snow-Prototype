@@ -3,6 +3,8 @@
 [ext_resource type="Script" uid="uid://c32qpu7chesaw" path="res://debug_character.gd" id="1_x8p32"]
 
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_ii28r"]
+radial_segments = 8
+rings = 2
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_or73b"]
 
@@ -34,3 +36,4 @@ debug_shape_thickness = 5
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, -0.4)
 current = true
 fov = 104.1
+far = 1000.0

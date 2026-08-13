@@ -5,7 +5,7 @@ const SPEED = 5.0
 const JUMP_VELOCITY = 6.0
 const HEIGHT : float = 2.0
 const SNOWHIGH : float = 1.5
-const SNOWMED : float = 0.9
+const SNOWMED : float = 0.7
 const SNOWHIGHMULT : float = 0.2
 const SNOWMEDMULT : float = 0.5
 @onready var snow_check_ray : RayCast3D = $RayCast3D
@@ -51,6 +51,7 @@ func _physics_process(delta: float) -> void:
 	var input_dir := Input.get_vector("l", "r", "f", "b")
 	var direction :Vector3= ($Pivot.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
 	var processed_speed : float = SPEED * check_snow_height(direction)
+	print("current speed is ", processed_speed)
 	if direction:
 		velocity.x = direction.x * processed_speed
 		velocity.z = direction.z * processed_speed

@@ -266,7 +266,7 @@ func LOD_mesh_update() -> void:
 		#most of the higher LOD values really only exist for low resolution, where having tiny LODs kinda matter when the pixelation makes that you 
 		#can't see more than 30 meters in HD.
 	snow_mesh.mesh = mesh
-	print("did some LOD stuff")
+	#print("did some LOD stuff")
 	snow_mesh.set_instance_shader_parameter("lod_level", LOD)
 
 func GPU_snow_accumulation_event(local_uv : Vector2, radius: float, accumulation_intensity: float = 1.0) -> void:
@@ -357,13 +357,13 @@ func CPU_snow_compression_event(local_uv : Vector2, radius: float, depth : float
 	
 	if !use_thread:
 		collisions_changed = true
-
+	depth *= 1.2
 	var grid_res := CPU_HEIGHTMAP_RESOLUTION
 	if radius <= 1.55 and !accumulate:
 		radius *= 1.5
 	elif accumulate and radius > 2.0:
 		print("accumulate snow anti-depth is ", depth)
-		depth *= 20.0
+		depth *= 15.0
 	var falloff_radius : float = radius * UV_REDUCTOR_RATIO
 	
 	var center_x : float = local_uv.x * (grid_res - 1)
@@ -382,7 +382,7 @@ func CPU_snow_compression_event(local_uv : Vector2, radius: float, depth : float
 				var grid_uv : Vector2 = Vector2(float(gx), float(gy)) / float(grid_res - 1)
 				var dist : float = grid_uv.distance_to(local_uv)
 				if dist < falloff_radius:
-					var influence : float = 1.0 - (dist / falloff_radius)
+					var influence : float = smoothstep(0.0, 1.0, 1.0 - (dist / falloff_radius))
 					var idx : int = gy * grid_res + gx
 					var target_height : float = clamp(snow_map_CPU[idx] + depth * influence, 0.0, full_height)
 					snow_map_CPU[idx] = max(snow_map_CPU[idx], target_height)
@@ -393,7 +393,7 @@ func CPU_snow_compression_event(local_uv : Vector2, radius: float, depth : float
 			var grid_uv : Vector2 = Vector2(float(gx), float(gy)) / float(grid_res - 1)
 			var dist : float = grid_uv.distance_to(local_uv)
 			if dist < falloff_radius:
-				var influence : float = 1.0 - (dist / falloff_radius)
+				var influence : float = smoothstep(0.0, 1.0, 1.0 - (dist / falloff_radius))
 				var idx : int = gy * grid_res + gx
 				var target_height : float = clamp(full_height * (1.0 - depth * influence), 0.0, full_height)
 				snow_map_CPU[idx] = min(snow_map_CPU[idx], target_height)
@@ -520,7 +520,7 @@ func on_player_move(world_position: Vector3, collision_height : float = -999, vi
 
 		
 	GPU_snow_compression_event(local_uv, 1.5, depth)
-	if !visualonly: CPU_queue_event(local_uv, 1.5, depth * 1.1, world_position)
+	if !visualonly: CPU_queue_event(local_uv, 1.5, depth , world_position)
 	#print("depth is ", depth)
 	return 
 
@@ -549,7 +549,10 @@ func on_accumulate_event(world_position: Vector3, radius: float, accumulation_in
 	var local_uv : Vector2 = world_to_tile_uv(world_position)
 	accumulation_intensity *= get_process_delta_time()
 	print("accumulation intensity is ", accumulation_intensity)
-	if !visualonly: CPU_queue_event(local_uv, radius, accumulation_intensity * 3.0, world_position, is_large_event, true)
+	if !visualonly: 
+		var full_height : float = SNOW_MAX_HEIGHT / CPU_HEIGHTMAP_SCALE
+		var cpu_accumulation_depth : float = accumulation_intensity * full_height
+		CPU_queue_event(local_uv, radius, cpu_accumulation_depth, world_position, is_large_event, true)
 	GPU_snow_accumulation_event(local_uv, radius, accumulation_intensity)
 
 ##Call this when you have just an "event" which doesn't select depth. instead, depth is derived from how high the event took place at.
@@ -557,7 +560,7 @@ func on_compression_event_auto_depth(world_position : Vector3, collision_height 
 	var depth : float
 	var sheared_height : float = shear_height_offset(Vector3(world_position.x, global_position.y, world_position.z))
 	depth = clamp((1.0 -((collision_height - sheared_height)) / SNOW_MAX_HEIGHT), 0.0, 1.0)
-	on_compression_event(world_position, depth, radius,mode, disable_propagate)
+	on_compression_event(world_position, depth * 1.1, radius,mode, disable_propagate)
 	#CPU_stash_or_use_sce(local_uv, )
 ##Call this when you have an event, where depth is an exact value. a value of 1 means fully compressed snow. enable disable propagate to prevent other tiles from also registering.
 ##Leave mode empty, and disable propagate too. These are developer settings for internal class functions. Bigger events should call on_explosion.
