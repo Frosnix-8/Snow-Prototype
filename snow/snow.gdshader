@@ -30,8 +30,10 @@ uniform float ice_tint_power : hint_range(0.5, 4.0, 0.1) = 1.5;
 uniform vec3 ice_glow_color : source_color = vec3(0.4, 0.75, 1.0);
 uniform float minimum_glow_strength : hint_range(0.0, 1.0, 0.05) = 0.2;
 uniform float ice_glow_strength : hint_range(0.0, 3.0, 0.05) = 1.0;
+uniform float glow_contrast : hint_range(1.0, 8.0, 0.1) = 4.0;
 uniform float ice_glow_sensitivity : hint_range(0.0, 10.0, 0.1) = 2.0;
-
+uniform float glow_min_depth : hint_range(0.0, 0.3, 0.01) = 0.05;
+uniform float glow_average_mip : hint_range(0.0, 6.0, 1.0) = 4.0;
 
 varying vec3 world_position;
 varying mat3 modelview_normal_matrix;
@@ -39,7 +41,7 @@ varying float strongest_attenuation;
 // Samples the heightmap at a UV and returns world-space-scale height,
 // using the same black=snow/white=compressed convention as everywhere else.
 float sample_snow_height(vec2 uv) {
-	return (1.0 - textureLod(snow_tex, uv, 3.0).r) * max_height;
+	return (1.0 - textureLod(snow_tex, uv, 0.0).r) * max_height;
 }
 
 float blur_1d(vec2 uv, vec2 direction, float texel_size) {
@@ -165,7 +167,30 @@ void update_snow_normal(
 	out_tangent = tangent_x;
 	out_binormal = tangent_y;
 }
+float sample_average_snow_height(vec2 uv, float mip) {
+	float texel = tile_scale / 128.0;
+	float h = 0.0;
 
+	h += textureLod(snow_tex, uv + texel * vec2( 4.0,  0.0), mip).r;
+	h += textureLod(snow_tex, uv + texel * vec2(-4.0,  0.0), mip).r;
+	h += textureLod(snow_tex, uv + texel * vec2( 0.0,  4.0), mip).r;
+	h += textureLod(snow_tex, uv + texel * vec2( 0.0, -4.0), mip).r;
+
+	return (1.0 - h * 0.25) * max_height;
+}
+// Returns local snow height relative to the average snow height.
+// If local snow is higher than the regional average, it is treated as 100%.
+// This prevents large-scale compression from killing the glow.
+float sample_relative_snow_height(vec2 uv, float mip_level) {
+	float local_height = sample_snow_height(uv);
+	float average_height = sample_average_snow_height(uv, mip_level);
+
+	return clamp(
+		local_height / max(average_height, 0.0001),
+		0.0,
+		1.0
+	);
+}
 void vertex() {
 	vec2 UV_local = (UV * tile_scale) + UV_local_coordinates;
 	vec3 local_up = normalize((inverse(MODEL_MATRIX) * vec4(0.0, 1.0, 0.0, 0.0)).xyz);
@@ -189,8 +214,11 @@ void vertex() {
 
 
 void fragment() {
-	vec2 UV_local = (UV * tile_scale) + UV_local_coordinates;
 	
+	vec2 UV_local = (UV * tile_scale) + UV_local_coordinates;
+	float local_height = sample_snow_height(UV_local);
+
+
 	vec2 detail_uv = UV * detail_scale;
 
 	vec3 detail_normal =
@@ -242,13 +270,26 @@ void fragment() {
 	ALBEDO = mix(ice_color, ice_color * detail_albedo, detail_albedo_strength);
 	ALBEDO = mix(ALBEDO, vec3(1.0), rim_fresnel * 0.5);
 
-	float depth_reduction = (1.0 - depth);
-	depth_reduction = max(depth_reduction, 0.1); 
-	float glow_fresnel = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), ice_glow_sensitivity);
-	EMISSION = ice_glow_color * glow_fresnel * ice_glow_strength * depth_factor * depth_reduction;
-	strongest_attenuation = 0.0;
-	
-}
+	;
+	float average_height = sample_average_snow_height(UV_local, glow_average_mip);
+
+	float ratio = local_height / max(average_height, 0.0001);
+
+	// ratio >= 1: local is at/above the surrounding average (homogeneous or a bump) -> full glow
+	// ratio < 1: local is a depression relative to surroundings -> occlusion curve
+	float glow_factor = pow(clamp(ratio, 0.0, 1.0), glow_contrast);
+
+	// low-snow cutoff: kill glow when almost no snow is left, overriding the ratio rule
+	float depth_cutoff = smoothstep(0.0, glow_min_depth, local_height / max_height);
+	glow_factor *= depth_cutoff;
+
+	float glow_fresnel = pow(
+		1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0),
+		ice_glow_sensitivity
+	);
+
+	EMISSION = ice_glow_color * glow_fresnel * ice_glow_strength * glow_factor;
+	}
 //void light() {
 	//float attenuation = max(strongest_attenuation, ATTENUATION);
 	//float NdotL = clamp(dot(NORMAL, LIGHT), 0.0, 1.0);

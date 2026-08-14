@@ -2,28 +2,50 @@ extends Node
 ##Manager of snow surfaces in the game.
 #class_name Snow_Surface_Manager
 signal all_tiles_ready
+
 var Tiles : Array[Snow_Tile]
 var snow_mat : ShaderMaterial = preload("res://snow/snow meshes/snow-shader-material.tres")
-var noise : FastNoiseLite = FastNoiseLite.new()
-var seed : int
+var blizzard_active : bool = false
+var blizzard_accumulation_rate : float = 0.1
+enum eventtypes {
+	RADIAL, ##Event that has a radius,
+	BLIZZARD, ##Event that accumulates every tile.
+}
+var ticks : int = 0
+#
+#func _ready() -> void:
+	#await get_tree().physics_frame
+	#noise_setup()
+
+#func noise_generate_new_seed() -> void:
+	#if !is_multiplayer_authority():
+		#return
+	#seed = randi()
+	#noise.set_seed(seed)
+	#if multiplayer.has_multiplayer_peer():
+		#noise_transfer_new_seed.rpc(seed)
+	#noise_setup()
+	#
+
+#@rpc("authority", "call_remote","reliable")
+#func noise_transfer_new_seed(new_seed : int) -> void:
+	#seed = new_seed
+	#noise_setup()
+#
+#@rpc("any_peer", "call_remote", "reliable")
+#func request_noise_new_seed() -> void:
+	#noise_transfer_new_seed.rpc_id(multiplayer.get_remote_sender_id())
+#
+###call on new games or different snows.
+#func noise_setup() -> void:
+	#if seed == -1:
+		#noise_generate_new_seed()
+	#SnowComputeManager.generate_noise_map(seed, frequency)
+	#noise.set_seed(seed)
+	#noise.set_frequency(frequency)
+		#
 
 
-func noise_generate_new_seed() -> void:
-	if !is_multiplayer_authority():
-		return
-	seed = randi()
-	noise.set_seed(seed)
-	if multiplayer.has_multiplayer_peer():
-		noise_transfer_new_seed.rpc(seed)
-	
-@rpc("authority", "call_local","reliable")
-func noise_transfer_new_seed(new_seed : int) -> void:
-	seed = new_seed
-	noise.set_seed(seed)
-
-func noise_setup() -> void:
-	pass
-		
 
 func register_tile(tile : Snow_Tile) -> void:
 	Tiles.append(tile)
@@ -36,7 +58,7 @@ func remove_tile(tile : Snow_Tile) -> void:
 func reset_all_snow(height: float = 1.0) -> void:
 	print("resetting snow")
 	height = 1.0 - height
-	
+	#height = 
 	SnowComputeManager._create_atlas(height)
 	for x in Tiles:
 		x.TMP_CPU_heightmap_reset(height)
@@ -67,5 +89,30 @@ func get_tiles_in_radius(world_position: Vector3, radius: float) -> Array[Snow_T
 			result.append(tile)
 	print("there are ", result.size(), " tiles around the master.")
 	return result
+
+func debug_toggle_snow_storm(rate: float = 0.1) -> void:
+	if SnowComputeManager.ambient_accumulation_enabled == true:
+		deactivate_snow_storm()
+	else:
+		activate_snow_storm(rate)
+##begins slowly accumulating snow.
+@rpc("authority", "call_remote", "reliable")
+func activate_snow_storm(rate: float = 0.1) -> void:
+	print("starting snow blizzard")
+
+	if multiplayer.has_multiplayer_peer() and is_multiplayer_authority():
+		activate_snow_storm.rpc(rate)
 	
-	
+	SnowComputeManager.ambient_accumulation_enabled = true
+	blizzard_active = true
+	SnowComputeManager.ambient_accumulation_rate = rate
+	blizzard_accumulation_rate = rate
+
+@rpc("authority", "call_remote", "reliable")
+func deactivate_snow_storm() -> void:
+	print("stopping snow blizzard")
+	blizzard_active = false
+	SnowComputeManager.ambient_accumulation_enabled = false
+	if multiplayer.has_multiplayer_peer() and is_multiplayer_authority():
+		deactivate_snow_storm.rpc()
+		

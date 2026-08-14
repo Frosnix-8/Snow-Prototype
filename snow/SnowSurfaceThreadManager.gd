@@ -22,6 +22,19 @@ func enqueue_tile(tile: Snow_Tile) -> void:
 	queue_mutex.unlock()
 	queue_semaphore.post()
 
+func enqueue_tiles(tiles : Array[Snow_Tile]) -> void:
+	queue_mutex.lock()
+	for x in tiles.size():
+		if tiles[x] not in job_queue:
+			job_queue.append(tiles[x])
+	queue_mutex.unlock()
+	queue_semaphore.post(tiles.size())
+	print("queued a bunch of tiles")
+	
+#func _process(delta: float) -> void:
+	#if SnowSurfaceManager.blizzard_active:
+		#queue_semaphore.post()
+
 func _worker_loop() -> void:
 	while running:
 		queue_semaphore.wait() # blocks until work is posted, no busy-spin
@@ -32,7 +45,10 @@ func _worker_loop() -> void:
 		var tile : Snow_Tile = job_queue.pop_front()
 		queue_mutex.unlock()
 		if is_instance_valid(tile):
+			#print("intiating some thread stuff")
 			Snow_Tile.CPU_workerthread_compute_pending_events(tile)
+		else:
+			push_warning("attempted to access invalid tile ", tile)
 
 func shutdown() -> void:
 	running = false

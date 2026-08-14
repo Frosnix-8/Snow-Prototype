@@ -51,16 +51,19 @@ func _physics_process(delta: float) -> void:
 	var input_dir := Input.get_vector("l", "r", "f", "b")
 	var direction :Vector3= ($Pivot.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
 	var processed_speed : float = SPEED * check_snow_height(direction)
-	print("current speed is ", processed_speed)
-	if direction:
-		velocity.x = direction.x * processed_speed
-		velocity.z = direction.z * processed_speed
-	
-	
-		
-	else:
-		velocity.x = move_toward(velocity.x, 0, processed_speed)
-		velocity.z = move_toward(velocity.z, 0, processed_speed)
+	#print("current speed is ", processed_speed)
+	#if direction:
+		#velocity.x = direction.x * processed_speed
+		#velocity.z = direction.z * processed_speed
+	#
+	#
+		#
+	#else:
+		#velocity.x = move_toward(velocity.x, 0, processed_speed)
+		#velocity.z = move_toward(velocity.z, 0, processed_speed)
+	var vertical : float = velocity.y 
+	velocity = velocity.move_toward(direction * processed_speed, SPEED * delta )
+	velocity.y = vertical
 	dir = direction
 	#$RayCast3D.position = basis.inverse() * direction  + Vector3(0.0,1.5,0.0)
 	if ticks % 1 == 0 and ticks_since_moved < 3:
@@ -148,3 +151,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	elif event.is_action_pressed("ui_left"):
 		BFG()
+	elif event.is_action_pressed("debug blizzard"):
+		print("toggling blizzard")
+		SnowSurfaceManager.debug_toggle_snow_storm(0.15)
