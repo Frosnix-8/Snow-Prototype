@@ -28,9 +28,14 @@ bear in mind this project was not made for you, it is made for my personal work.
 -great performance right now
 -the ability to make the tiles shear vertically!!! this does not cause issues, works perfectly fine! don't rotate, shear!!! (there is a debug for editors)
 -whatever else i'm gonna add later.
+-a few presets for when you have something move through snow, including but not limited to player movement, footsteps, explosions, and especially things that increase snow level
+-the ability to increase the snow level everywhere at once.
 
+# Performance Requirements
+This system requires you have at least 6 cores preferably, something with hyper threading so you have at least a dozen threads or so to work. this system is a bit expensive on the threads size but is adaptive. it can use up to 3 threads for the work it does, not including threads created and used internally by Godot.
+Graphically, this is a very light project. work has been done to make ambient occlusion and GI less necessary on the snow alone. if you have things in snow then it's maybe useful. For now, no post-processing except glow is enabled. you can run this on integrated GPUs from the intel 10th gen lineup, and I suppose all later generations, including those from AMD. on an RTX 2060 mobile max-Q, (power limited to 60W), you can get about 500 fps consistently, or frame times of about 1.5 Ms. most GPUs today, if you have any gaming pc, will run even better graphics. Proof that it's pretty good!
 # the sad
-once this is developed enough, i'm going to merge this with another private project I'm working on, so you won't get any more updates, sorry.
+once this is developed enough, I'm going to merge this with another private project I'm working on, so you won't get any more updates, sorry.
 but not yet don't worry
 
 *everything here is subject to change because I'm working on it as you read.
