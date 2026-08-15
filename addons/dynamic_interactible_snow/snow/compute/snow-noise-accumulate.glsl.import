@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://tj1k6agcksij"
+path="res://.godot/imported/snow-noise-accumulate.glsl-b4be4d85bf3a47fc232e659c1bce739d.res"
+
+[deps]
+
+source_file="res://addons/dynamic_interactible_snow/snow/compute/snow-noise-accumulate.glsl"
+dest_files=["res://.godot/imported/snow-noise-accumulate.glsl-b4be4d85bf3a47fc232e659c1bce739d.res"]
+
+[params]
+

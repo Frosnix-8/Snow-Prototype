@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://bkbbcppiya82c"]
 
-[ext_resource type="PackedScene" uid="uid://bbilycy11qf2j" path="res://snow/snow prototype.tscn" id="1_ig7tw"]
+[ext_resource type="PackedScene" uid="uid://bbilycy11qf2j" path="res://addons/dynamic_interactible_snow/snow/scenes/DEPRACATED.tscn" id="1_ig7tw"]
 [ext_resource type="PackedScene" uid="uid://c4wev7nhqhbmo" path="res://debug character.tscn" id="2_0xm2m"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_7dm0k"]

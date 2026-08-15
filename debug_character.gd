@@ -153,4 +153,4 @@ func _unhandled_input(event: InputEvent) -> void:
 		BFG()
 	elif event.is_action_pressed("debug blizzard"):
 		print("toggling blizzard")
-		SnowSurfaceManager.debug_toggle_snow_storm(0.15)
+		SnowSurfaceManager.debug_toggle_snow_storm(0.1)

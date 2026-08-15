@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://0kq06q7uvbye"]
 
-[ext_resource type="PackedScene" uid="uid://b2lyjc7a7wuo8" path="res://snow/snow_stamp.tscn" id="1_0fbet"]
+[ext_resource type="PackedScene" uid="uid://b2lyjc7a7wuo8" path="res://addons/dynamic_interactible_snow/snow/scenes/DEPRACATED snow_stamp.tscn" id="1_0fbet"]
 
 [node name="Control" type="Control" unique_id=1816131286]
 layout_mode = 3
@@ -12,10 +12,14 @@ grow_vertical = 2
 
 [node name="SnowStamp" parent="." unique_id=95645194 instance=ExtResource("1_0fbet")]
 layout_mode = 0
-anchors_preset = 0
+anchor_right = 0.0
+anchor_bottom = 0.0
+grow_horizontal = 1
+grow_vertical = 1
 
 [node name="SnowStamp2" parent="." unique_id=312532085 instance=ExtResource("1_0fbet")]
 layout_mode = 1
+anchors_preset = -1
 anchor_left = 0.0078125
 anchor_top = 0.0015432099
 anchor_right = 0.025812501

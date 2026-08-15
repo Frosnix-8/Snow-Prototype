@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://b3cd4fjea5qjh"
+path="res://.godot/imported/snow-stamp.glsl-f32ddde06b3820656a10733fc99d852e.res"
+
+[deps]
+
+source_file="res://addons/dynamic_interactible_snow/snow/compute/snow-stamp.glsl"
+dest_files=["res://.godot/imported/snow-stamp.glsl-f32ddde06b3820656a10733fc99d852e.res"]
+
+[params]
+

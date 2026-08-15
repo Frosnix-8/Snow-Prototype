@@ -17,8 +17,8 @@ config/icon="res://icon.svg"
 
 [autoload]
 
-SnowSurfaceManager="*uid://y5tou42hvelt"
 SnowComputeManager="*uid://f2ykbk33cplf"
+SnowSurfaceManager="*uid://y5tou42hvelt"
 SnowSurfaceThreadManager="*uid://c2cnynv55euhd"
 
 [display]
@@ -27,6 +27,7 @@ window/size/viewport_width=1920
 window/size/viewport_height=1080
 window/size/always_on_top=true
 window/stretch/mode="canvas_items"
+window/vsync/vsync_mode=0
 
 [dotnet]
 
@@ -36,6 +37,10 @@ project/assembly_name="snow_prototype"
 
 version_control/plugin_name="GitPlugin"
 version_control/autoload_on_startup=true
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/dynamic_interactible_snow/plugin.cfg")
 
 [input]
 

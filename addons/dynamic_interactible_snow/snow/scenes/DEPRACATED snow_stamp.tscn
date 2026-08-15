@@ -1,0 +1,21 @@
+[gd_scene format=3 uid="uid://b2lyjc7a7wuo8"]
+
+[ext_resource type="Shader" uid="uid://d2hrdqu7uauh3" path="res://addons/dynamic_interactible_snow/snow/shaders/snowstampshader.gdshader" id="1_yekp3"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_83my3"]
+shader = ExtResource("1_yekp3")
+shader_parameter/stamp_radius = 0.60000000894072
+
+[sub_resource type="PlaceholderTexture2D" id="PlaceholderTexture2D_vcoss"]
+size = Vector2(21, 21)
+
+[node name="SnowStamp" type="TextureRect" unique_id=95645194]
+material = SubResource("ShaderMaterial_83my3")
+anchor_right = 0.018000001
+anchor_bottom = 0.032
+offset_right = 0.26399803
+offset_bottom = 0.26399994
+grow_horizontal = 2
+grow_vertical = 2
+texture = SubResource("PlaceholderTexture2D_vcoss")
+metadata/_edit_use_anchors_ = true
