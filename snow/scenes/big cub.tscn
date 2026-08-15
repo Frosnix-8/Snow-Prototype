@@ -1,0 +1,14 @@
+[gd_scene format=3 uid="uid://d2gkrhf2nptwx"]
+
+[ext_resource type="ArrayOccluder3D" uid="uid://dhewmvi3qxf7f" path="res://snow/resources/big cub.occ" id="1_4pfmf"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_or73b"]
+size = Vector3(5, 5.0683594, 5)
+
+[node name="MeshInstance3D" type="MeshInstance3D" unique_id=1760380323]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.4658203, 0)
+mesh = SubResource("BoxMesh_or73b")
+
+[node name="OccluderInstance3D" type="OccluderInstance3D" parent="." unique_id=1291605290]
+occluder = ExtResource("1_4pfmf")
+bake_simplification_distance = 0.51

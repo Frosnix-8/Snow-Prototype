@@ -1,0 +1,70 @@
+[gd_scene format=3 uid="uid://dw2bem4t82aw7"]
+
+[ext_resource type="PackedScene" uid="uid://c4wev7nhqhbmo" path="res://snow/scenes/debug character.tscn" id="1_pr6qo"]
+[ext_resource type="PackedScene" uid="uid://1g2h8fl72xyg" path="res://snow/scenes/snow-texture-redux.tscn" id="2_ml453"]
+[ext_resource type="PackedScene" uid="uid://d2gkrhf2nptwx" path="res://snow/scenes/big cub.tscn" id="3_7dhn2"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_7dm0k"]
+sky_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
+ground_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
+
+[sub_resource type="Sky" id="Sky_ig7tw"]
+sky_material = SubResource("ProceduralSkyMaterial_7dm0k")
+
+[sub_resource type="Environment" id="Environment_0xm2m"]
+background_mode = 2
+sky = SubResource("Sky_ig7tw")
+tonemap_mode = 4
+glow_enabled = true
+
+[sub_resource type="WorldBoundaryShape3D" id="WorldBoundaryShape3D_or73b"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ii28r"]
+albedo_color = Color(0.36847892, 0.36847895, 0.36847892, 1)
+metallic = 0.37
+roughness = 0.45
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_or73b"]
+material = SubResource("StandardMaterial3D_ii28r")
+size = Vector2(96, 96)
+
+[node name="MAin" type="Node3D" unique_id=1711138950]
+
+[node name="SpotLight3D" type="SpotLight3D" parent="." unique_id=1231824593]
+transform = Transform3D(-0.36527315, 0.92574745, -0.0978122, 0.9289406, 0.36930087, 0.02619605, 0.060373057, -0.08129302, -0.99486005, 21.242418, 5.866832, -21.373161)
+light_energy = 16.0
+shadow_enabled = true
+spot_range = 89.712
+spot_angle = 29.82
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=813654618]
+transform = Transform3D(-0.6790836, -0.25679868, 0.68767726, 0.5589695, 0.4263347, 0.7111903, -0.47581345, 0.86734825, -0.1459743, 0, 0, 0)
+shadow_enabled = true
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=186353460]
+environment = SubResource("Environment_0xm2m")
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=1109330497]
+transform = Transform3D(1, 0, 0, 0, 0.87465984, 0.4847372, 0, -0.4847372, 0.87465984, 0, 3.2038226, 4.736644)
+
+[node name="StaticBody3D" type="StaticBody3D" parent="." unique_id=1905197410]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.038975835, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D" unique_id=871207189]
+shape = SubResource("WorldBoundaryShape3D_or73b")
+debug_color = Color(0, 0.6, 0.69803923, 0)
+debug_fill = false
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="StaticBody3D" unique_id=1387613222]
+cast_shadow = 0
+mesh = SubResource("PlaneMesh_or73b")
+
+[node name="CharacterBody3D" parent="." unique_id=911457540 instance=ExtResource("1_pr6qo")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.52370214, 2.2850246, 5.6671014)
+
+[node name="SnowTile" parent="." unique_id=761074471 instance=ExtResource("2_ml453")]
+debug_propagate_large_area = true
+collision_update_ratio = 10
+
+[node name="MeshInstance3D" parent="." unique_id=1760380323 instance=ExtResource("3_7dhn2")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 29.18583, 2.4658203, 0)

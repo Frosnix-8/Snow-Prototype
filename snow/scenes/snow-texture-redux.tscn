@@ -1,0 +1,33 @@
+[gd_scene format=3 uid="uid://1g2h8fl72xyg"]
+
+[ext_resource type="Script" uid="uid://c08muwtny8qmk" path="res://snow/scripts/snow_tile_atlas.gd" id="1_e3tj1"]
+[ext_resource type="Material" uid="uid://bcevsp0b8lo6k" path="res://snow/snow meshes/snow-shader-material.tres" id="2_v8h12"]
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_ii28r"]
+material = ExtResource("2_v8h12")
+size = Vector2(6, 6)
+subdivide_width = 128
+subdivide_depth = 128
+
+[sub_resource type="HeightMapShape3D" id="HeightMapShape3D_or73b"]
+map_width = 13
+map_depth = 13
+map_data = PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+
+[node name="SnowTile" type="StaticBody3D" unique_id=761074471]
+collision_layer = 2
+collision_mask = 2
+script = ExtResource("1_e3tj1")
+
+[node name="SnowMesh" type="MeshInstance3D" parent="." unique_id=539090830]
+extra_cull_margin = 0.5
+custom_aabb = AABB(-3, 0, -3, 6, 2, 6)
+gi_mode = 2
+visibility_range_fade_mode = 1
+mesh = SubResource("PlaneMesh_ii28r")
+
+[node name="HeightCollision" type="CollisionShape3D" parent="." unique_id=1175581308]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
+shape = SubResource("HeightMapShape3D_or73b")
+disabled = true
+debug_color = Color(0, 0.5950001, 0.7, 0.74509805)

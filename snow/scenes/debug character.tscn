@@ -1,0 +1,39 @@
+[gd_scene format=3 uid="uid://c4wev7nhqhbmo"]
+
+[ext_resource type="Script" uid="uid://c32qpu7chesaw" path="res://snow/scripts/debug_character.gd" id="1_6o7pn"]
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_ii28r"]
+radial_segments = 8
+rings = 2
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_or73b"]
+
+[node name="CharacterBody3D" type="CharacterBody3D" unique_id=911457540]
+input_ray_pickable = false
+script = ExtResource("1_6o7pn")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=496867338]
+mesh = SubResource("CapsuleMesh_ii28r")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=887595502]
+shape = SubResource("CapsuleShape3D_or73b")
+
+[node name="RayCast3D" type="RayCast3D" parent="." unique_id=794266017]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
+target_position = Vector3(0, -4.5, 0)
+collision_mask = 2
+
+[node name="SnowHeightCheck" type="RayCast3D" parent="." unique_id=911556599]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -0.78)
+target_position = Vector3(0, -2.545, 0)
+collision_mask = 2
+debug_shape_custom_color = Color(1, 0.32669383, 0.57569635, 1)
+debug_shape_thickness = 5
+
+[node name="Pivot" type="Node3D" parent="." unique_id=807780952]
+
+[node name="Camera3D" type="Camera3D" parent="Pivot" unique_id=426081362]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, -0.4)
+current = true
+fov = 104.1
+far = 1000.0

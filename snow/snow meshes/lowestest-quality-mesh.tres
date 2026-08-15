@@ -1,0 +1,9 @@
+[gd_resource type="PlaneMesh" format=3 uid="uid://dams7wqbc8ait"]
+
+[ext_resource type="Material" uid="uid://bcevsp0b8lo6k" path="res://snow/snow meshes/snow-shader-material.tres" id="1_ht2i2"]
+
+[resource]
+material = ExtResource("1_ht2i2")
+size = Vector2(6, 6)
+subdivide_width = 8
+subdivide_depth = 8

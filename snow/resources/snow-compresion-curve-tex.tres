@@ -1,0 +1,6 @@
+[gd_resource type="CurveTexture" format=3 uid="uid://7501kxu043fo"]
+
+[ext_resource type="Curve" uid="uid://bcyfad8r1bvp1" path="res://snow/resources/snow-compression-curve.tres" id="1_ugu2x"]
+
+[resource]
+curve = ExtResource("1_ugu2x")
