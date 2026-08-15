@@ -22,18 +22,18 @@ var CPU_grid_thread_mutex_instance:Mutex = Mutex.new()
 
 const SNOW_MAX_HEIGHT: float = 2.0
 @onready var snow_mesh     : MeshInstance3D = $SnowMesh
-static var snow_mesh_material : ShaderMaterial = preload("res://snow/snow meshes/snow-shader-material.tres")
+static var snow_mesh_material : ShaderMaterial = preload("../../snow/snow meshes/snow-shader-material.tres")
 
-var mesh_high : PlaneMesh = preload("res://snow/snow meshes/high-quality-plane.tres")
-var mesh_med :  PlaneMesh = preload("res://snow/snow meshes/medium-quality-mesh.tres")
-var mesh_low :PlaneMesh = preload("res://snow/snow meshes/low-quality-mesh.tres")
-var mesh_lowst :  PlaneMesh = preload("res://snow/snow meshes/lowest-quality-mesh.tres")
-var mesh_lowsp : PlaneMesh = preload("res://snow/snow meshes/lowestest-quality-mesh.tres")
-var mesh_lowmx : PlaneMesh = preload("res://snow/snow meshes/lowestestest-quality-mesh.tres")
+var mesh_high : PlaneMesh = preload("../../snow/snow meshes/high-quality-plane.tres")
+var mesh_med :  PlaneMesh = preload("../../snow/snow meshes/medium-quality-mesh.tres")
+var mesh_low :PlaneMesh = preload("../../snow/snow meshes/low-quality-mesh.tres")
+var mesh_lowst :  PlaneMesh = preload("../../snow/snow meshes/lowest-quality-mesh.tres")
+var mesh_lowsp : PlaneMesh = preload("../../snow/snow meshes/lowestest-quality-mesh.tres")
+var mesh_lowmx : PlaneMesh = preload("../../snow/snow meshes/lowestestest-quality-mesh.tres")
 
 
 #@onready var snow_curve : CurveTexture = preload("res://snow/snow-compresion-curve-tex.tres")
-@onready var snow_tile : PackedScene = preload("res://snow/scenes/snow-texture-redux.tscn")
+@onready var snow_tile : PackedScene = preload("../../snow/scenes/snow-texture-redux.tscn")
 @export_category("Debug")
 @export var debug_step := false
 @export var debug_print := false

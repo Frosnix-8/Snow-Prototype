@@ -1,0 +1,3 @@
+[submodule "addons/dynamic-interactible-snow"]
+	path = addons/dynamic-interactible-snow
+	url = git@github.com:Frosnix-8/Snow-Prototype.git

@@ -151,6 +151,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	elif event.is_action_pressed("ui_left"):
 		BFG()
-	elif event.is_action_pressed("debug blizzard"):
+	elif event.is_action_pressed("ui_cancel"):
 		print("toggling blizzard")
 		SnowSurfaceManager.debug_toggle_snow_storm(0.1)

@@ -3,6 +3,12 @@ extends Node
 #every texture here is related to snow, so I will omit that from their names for simplicity
 var rd : RenderingDevice
 
+var ATLAS_SHADER :RDShaderFile= load("../../snow/compute/snow-stamp.glsl")
+var SMOOTH_SHADER :RDShaderFile= load("../../snow/compute/snow-stamp-smooth.glsl")
+var MIPMAP_SHADER :RDShaderFile= load("../../snow/compute/snow-mipmap.glsl")
+var NOISE_SHADER_DEPRACATED :RDShaderFile= load("../../snow/compute/snow-noise-generation.glsl")
+var ACCUMULATE_SHADER :RDShaderFile= load("../../snow/compute/snow-noise-accumulate.glsl")
+
 var atlas_texture : RID
 var atlas_texture_wrapper : Texture2DRD
 var displayed_atlas_texture : RID
@@ -58,32 +64,32 @@ func _ready() -> void:
 	_create_ambient_uniform_set()
 
 func _compile_shader() -> void:
-	var shader_file: RDShaderFile = load("res://snow/compute/snow-stamp.glsl")
+	var shader_file: RDShaderFile = ATLAS_SHADER
 	var spirv: RDShaderSPIRV = shader_file.get_spirv()
 	shader = rd.shader_create_from_spirv(spirv)
 	pipeline = rd.compute_pipeline_create(shader)
 	
 func _compile_smoothing_shader() -> void:
-	var shader_file: RDShaderFile = load("res://snow/compute/snow-stamp-smooth.glsl")
+	var shader_file: RDShaderFile = SMOOTH_SHADER
 	var spirv: RDShaderSPIRV = shader_file.get_spirv()
 	smoothing_shader = rd.shader_create_from_spirv(spirv)
 	smoothing_pipeline = rd.compute_pipeline_create(smoothing_shader)
 
 func _compile_mipmap_shader() -> void:
-	var shader_file : RDShaderFile = load("res://snow/compute/snow-mipmap.glsl")
+	var shader_file : RDShaderFile = MIPMAP_SHADER
 	var spirv : RDShaderSPIRV = shader_file.get_spirv()
 
 	mipmap_shader = rd.shader_create_from_spirv(spirv)
 	mipmap_pipeline = rd.compute_pipeline_create(mipmap_shader)
 
 func _compile_noise_shader() -> void:
-	var shader_file: RDShaderFile = load("res://snow/compute/snow-noise-generation.glsl")
+	var shader_file: RDShaderFile = NOISE_SHADER_DEPRACATED
 	var spirv: RDShaderSPIRV = shader_file.get_spirv()
 	noise_shader = rd.shader_create_from_spirv(spirv)
 	noise_pipeline = rd.compute_pipeline_create(noise_shader)
 
 func _compile_ambient_shader() -> void:
-	var shader_file: RDShaderFile = load("res://snow/compute/snow-noise-accumulate.glsl")
+	var shader_file: RDShaderFile = ACCUMULATE_SHADER
 	var spirv: RDShaderSPIRV = shader_file.get_spirv()
 	ambient_shader = rd.shader_create_from_spirv(spirv)
 	ambient_pipeline = rd.compute_pipeline_create(ambient_shader)

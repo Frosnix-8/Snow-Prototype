@@ -3,10 +3,11 @@ extends EditorPlugin
 
 const NAME : StringName = &"The Dynamic Interactible Snow Plugin"
 func _enable_plugin() -> void:
+	
 	print("Initiating ", NAME, "...")
-	add_autoload_singleton("SnowComputeManager", "res://addons/dynamic_interactible_snow/snow/singletons/SnowComputeManager.gd")
-	add_autoload_singleton("SnowSurfaceManager", "res://addons/dynamic_interactible_snow/snow/singletons/SnowSurfaceManager.gd")
-	add_autoload_singleton("SnowSurfaceThreadManager","res://addons/dynamic_interactible_snow/snow/singletons/SnowSurfaceThreadManager.gd")
+	add_autoload_singleton("SnowComputeManager", "/snow/singletons/SnowComputeManager.gd")
+	add_autoload_singleton("SnowSurfaceManager", "/snow/singletons/SnowSurfaceManager.gd")
+	add_autoload_singleton("SnowSurfaceThreadManager","/snow/singletons/SnowSurfaceThreadManager.gd")
 	print("In order for ", NAME, " to work, ensure the three globals in 'project settings / globals' are enabled: SnowSurfaceManager, SnowSurfaceThreadManager, and SnowComputeManager.")
 
 func _disable_plugin() -> void:
