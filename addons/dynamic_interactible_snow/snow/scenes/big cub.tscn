@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://d2gkrhf2nptwx"]
 
-[ext_resource type="ArrayOccluder3D" uid="uid://dhewmvi3qxf7f" path="res://big cub.occ" id="1_7bk8d"]
+[ext_resource type="ArrayOccluder3D" uid="uid://dhewmvi3qxf7f" path="res://addons/dynamic_interactible_snow/snow/resources/big cub.occ" id="1_7bk8d"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_or73b"]
 size = Vector3(5, 5.0683594, 5)

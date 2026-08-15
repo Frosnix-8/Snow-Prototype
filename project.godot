@@ -13,7 +13,6 @@ config_version=5
 config/name="snow_prototype"
 run/main_scene="uid://dw2bem4t82aw7"
 config/features=PackedStringArray("4.7", "Mobile")
-config/icon="res://icon.svg"
 
 [autoload]
 
