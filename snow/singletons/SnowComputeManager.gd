@@ -1,13 +1,16 @@
 extends Node
-##Handles all compute related to snow as a singleton.
-#every texture here is related to snow, so I will omit that from their names for simplicity
+## Handles all compute related to snow as a singleton.
+# every texture here is related to snow, so I will omit that from their names for simplicity
 var rd : RenderingDevice
 
-var ATLAS_SHADER :RDShaderFile= load("../../snow/compute/snow-stamp.glsl")
-var SMOOTH_SHADER :RDShaderFile= load("../../snow/compute/snow-stamp-smooth.glsl")
-var MIPMAP_SHADER :RDShaderFile= load("../../snow/compute/snow-mipmap.glsl")
-var NOISE_SHADER_DEPRACATED :RDShaderFile= load("../../snow/compute/snow-noise-generation.glsl")
-var ACCUMULATE_SHADER :RDShaderFile= load("../../snow/compute/snow-noise-accumulate.glsl")
+# --- DYNAMIC PATH REFACTOR ---
+# Defined as uninitialized properties to prevent static compilation path errors on macOS
+var ATLAS_SHADER : RDShaderFile
+var SMOOTH_SHADER : RDShaderFile
+var MIPMAP_SHADER : RDShaderFile
+var NOISE_SHADER_DEPRACATED : RDShaderFile
+var ACCUMULATE_SHADER : RDShaderFile
+# ------------------------------
 
 var atlas_texture : RID
 var atlas_texture_wrapper : Texture2DRD
@@ -41,17 +44,30 @@ var displayed_mip_views : Array[RID] = []
 
 const ATLAS_RESOLUTION : int = 2048
 const SECT_RESOLUTION  : int = 128
-##Compression uses max blending.
+## Compression uses max blending.
 const OP_MAX_COMPRESS : int = 0
-##Snow addition uses Accumulative blending.
+## Snow addition uses Accumulative blending.
 const OP_ACCUMULATE : int = 1
 
 var pending_stamps: Array[Dictionary] = []
 
 var smoothing_speed : float = 0.9
 var dampen_factor : float = 15.0  # add near smoothing_speed at top of file
+
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
+	# --- CORRECTED DYNAMIC PATH PARSING LOGIC ---
+	# 1. Grab the absolute directory location of this exact running script file
+	var base_dir : String = get_script().resource_path.get_base_dir()
+	
+	# 2. Use path_join() and simplify_path() to safely map the relative '..' syntax
+	ATLAS_SHADER = load(base_dir.path_join("../../snow/compute/snow-stamp.glsl").simplify_path())
+	SMOOTH_SHADER = load(base_dir.path_join("../../snow/compute/snow-stamp-smooth.glsl").simplify_path())
+	MIPMAP_SHADER = load(base_dir.path_join("../../snow/compute/snow-mipmap.glsl").simplify_path())
+	NOISE_SHADER_DEPRACATED = load(base_dir.path_join("../../snow/compute/snow-noise-generation.glsl").simplify_path())
+	ACCUMULATE_SHADER = load(base_dir.path_join("../../snow/compute/snow-noise-accumulate.glsl").simplify_path())
+	# --- CORRECTED LOGIC END ---
+
 	rd = RenderingServer.get_rendering_device()
 	_compile_shader()
 	_compile_smoothing_shader()
@@ -78,7 +94,6 @@ func _compile_smoothing_shader() -> void:
 func _compile_mipmap_shader() -> void:
 	var shader_file : RDShaderFile = MIPMAP_SHADER
 	var spirv : RDShaderSPIRV = shader_file.get_spirv()
-
 	mipmap_shader = rd.shader_create_from_spirv(spirv)
 	mipmap_pipeline = rd.compute_pipeline_create(mipmap_shader)
 
@@ -94,7 +109,7 @@ func _compile_ambient_shader() -> void:
 	ambient_shader = rd.shader_create_from_spirv(spirv)
 	ambient_pipeline = rd.compute_pipeline_create(ambient_shader)
 
-##Sets up the atlas texture as a black texture with a resolution specified by the constant above.
+## Sets up the atlas texture as a black texture with a resolution specified by the constant above.
 func _create_atlas(initial_value: float = 0.0) -> void:
 	var fmt := RDTextureFormat.new()
 	fmt.width = ATLAS_RESOLUTION
@@ -134,7 +149,6 @@ func _create_displayed_atlas() -> void:
 	var fmt := RDTextureFormat.new()
 	fmt.width = ATLAS_RESOLUTION
 	fmt.height = ATLAS_RESOLUTION
-	#fmt.format = RenderingDevice.DATA_FORMAT_R32_SFLOAT
 	fmt.format = RenderingDevice.DATA_FORMAT_R8_UNORM
 
 	fmt.set_mipmaps(7)
@@ -146,7 +160,6 @@ func _create_displayed_atlas() -> void:
 	)
 
 	var view := RDTextureView.new()
-
 	displayed_atlas_texture = rd.texture_create(fmt, view)
 
 	if not displayed_atlas_texture.is_valid():
@@ -156,12 +169,10 @@ func _create_displayed_atlas() -> void:
 	var total_size : int = 0
 	for mip in 7:
 		var resolution := ATLAS_RESOLUTION >> mip
-		total_size += resolution * resolution * 1 # 4 bytes/pixel, float
+		total_size += resolution * resolution * 1 
 
 	var initial_data := PackedByteArray()
 	initial_data.resize(total_size)
-	#for i in range(0, initial_data.size(), 4):
-		#initial_data.encode_float(i, 0.0)
 	initial_data.fill(0.0)
 
 	rd.texture_update(
@@ -415,6 +426,9 @@ func _smooth_atlas_step(delta) -> void:
 
 func _ambient_accumulate_step(delta: float) -> void:
 	if not ambient_accumulation_enabled:
+		return
+	if not ambient_uniform_set.is_valid():
+		push_warning("ambient_uniform_set invalid, skipping accumulate step.")
 		return
 
 	var push_constant := PackedByteArray()

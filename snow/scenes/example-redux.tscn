@@ -1,8 +1,8 @@
 [gd_scene format=3 uid="uid://dw2bem4t82aw7"]
 
-[ext_resource type="PackedScene" uid="uid://c4wev7nhqhbmo" path="res://snow/scenes/debug character.tscn" id="1_pr6qo"]
-[ext_resource type="PackedScene" uid="uid://1g2h8fl72xyg" path="res://snow/scenes/snow-texture-redux.tscn" id="2_ml453"]
-[ext_resource type="PackedScene" uid="uid://d2gkrhf2nptwx" path="res://snow/scenes/big cub.tscn" id="3_7dhn2"]
+[ext_resource type="PackedScene" uid="uid://c4wev7nhqhbmo" path="res://Addons/dynamic-interactible-snow/snow/scenes/debug character.tscn" id="1_pr6qo"]
+[ext_resource type="PackedScene" uid="uid://1g2h8fl72xyg" path="res://Addons/dynamic-interactible-snow/snow/scenes/snow-texture-redux.tscn" id="2_ml453"]
+[ext_resource type="PackedScene" uid="uid://d2gkrhf2nptwx" path="res://Addons/dynamic-interactible-snow/snow/scenes/big cub.tscn" id="3_7dhn2"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_7dm0k"]
 sky_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)

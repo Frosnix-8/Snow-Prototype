@@ -48,7 +48,7 @@ func _physics_process(delta: float) -> void:
 
 	# Get the input direction and handle the movement/deceleration.
 	# As good practice, you should replace UI actions with custom gameplay actions.
-	var input_dir := Input.get_vector("l", "r", "f", "b")
+	var input_dir := Input.get_vector("left", "right", "foward", "back")
 	var direction :Vector3= ($Pivot.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
 	var processed_speed : float = SPEED * check_snow_height(direction)
 	#print("current speed is ", processed_speed)
@@ -147,7 +147,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	
 	elif event.is_action_pressed("ui_right"):
 		boom()
-	elif event.is_action_pressed("ui_end"):
+	elif event.is_action_pressed("ui_cancel"):
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	elif event.is_action_pressed("ui_left"):
 		BFG()

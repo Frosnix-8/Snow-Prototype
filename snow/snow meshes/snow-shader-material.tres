@@ -1,8 +1,8 @@
 [gd_resource type="ShaderMaterial" format=3 uid="uid://bcevsp0b8lo6k"]
 
-[ext_resource type="Shader" uid="uid://c8do3d0xbyfl0" path="res://snow/shaders/snow.gdshader" id="1_ru5i7"]
-[ext_resource type="Texture2D" uid="uid://cdsgcn8so5t7f" path="res://snow/textures/snow2kalbedo.png" id="2_cn70u"]
-[ext_resource type="Texture2D" uid="uid://c5uqidb3sq634" path="res://snow/textures/snow2knormal.png" id="3_ib6pn"]
+[ext_resource type="Shader" uid="uid://c8do3d0xbyfl0" path="res://Addons/dynamic-interactible-snow/snow/shaders/snow.gdshader" id="1_ru5i7"]
+[ext_resource type="Texture2D" uid="uid://cdsgcn8so5t7f" path="res://Addons/dynamic-interactible-snow/snow/textures/snow2kalbedo.png" id="2_cn70u"]
+[ext_resource type="Texture2D" uid="uid://c5uqidb3sq634" path="res://Addons/dynamic-interactible-snow/snow/textures/snow2knormal.png" id="3_ib6pn"]
 
 [sub_resource type="Gradient" id="Gradient_uxq15"]
 offsets = PackedFloat32Array(0, 0.048780486)

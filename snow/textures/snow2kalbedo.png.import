@@ -3,16 +3,17 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://cdsgcn8so5t7f"
-path.bptc="res://.godot/imported/snow2kalbedo.png-54c612ddd07d11f631c5333a98c12998.bptc.ctex"
+path.bptc="res://.godot/imported/snow2kalbedo.png-4affdb3b439cf85265f77c1f3d7948b6.bptc.ctex"
+path.astc="res://.godot/imported/snow2kalbedo.png-4affdb3b439cf85265f77c1f3d7948b6.astc.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
-source_file="res://snow/textures/snow2kalbedo.png"
-dest_files=["res://.godot/imported/snow2kalbedo.png-54c612ddd07d11f631c5333a98c12998.bptc.ctex"]
+source_file="res://Addons/dynamic-interactible-snow/snow/textures/snow2kalbedo.png"
+dest_files=["res://.godot/imported/snow2kalbedo.png-4affdb3b439cf85265f77c1f3d7948b6.bptc.ctex", "res://.godot/imported/snow2kalbedo.png-4affdb3b439cf85265f77c1f3d7948b6.astc.ctex"]
 
 [params]
 

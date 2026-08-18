@@ -3,12 +3,12 @@
 importer="glsl"
 type="RDShaderFile"
 uid="uid://b6lyd8h0yk4xn"
-path="res://.godot/imported/snow-stamp-smooth.glsl-da562494384d719dd35bfc2fedba5fa9.res"
+path="res://.godot/imported/snow-stamp-smooth.glsl-5fd0e71542a29b8d096b33d1ae865dd4.res"
 
 [deps]
 
-source_file="res://snow/compute/snow-stamp-smooth.glsl"
-dest_files=["res://.godot/imported/snow-stamp-smooth.glsl-da562494384d719dd35bfc2fedba5fa9.res"]
+source_file="res://Addons/dynamic-interactible-snow/snow/compute/snow-stamp-smooth.glsl"
+dest_files=["res://.godot/imported/snow-stamp-smooth.glsl-5fd0e71542a29b8d096b33d1ae865dd4.res"]
 
 [params]
 

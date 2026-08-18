@@ -49,11 +49,11 @@ void main() {
 		if (dist < s.radius) {
 			float t = 1.0 - (dist / s.radius);
 			float falloff = smoothstep(0.0, 1.0, t);
-			float stamp_value = s.value * falloff;
+			float stamp_value = clamp(s.value * falloff, 0.0, 1.0);
 			if (s.operation == OP_MAX_COMPRESS) {
 				result = max(result, stamp_value);
 			}
-			else if (s.operation == OP_ACCUMULATE){
+			else if (s.operation == OP_ACCUMULATE) {
 				result = max(result - stamp_value, 0.0);
 			}
 		}

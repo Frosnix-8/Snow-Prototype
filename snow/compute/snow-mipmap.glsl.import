@@ -3,12 +3,12 @@
 importer="glsl"
 type="RDShaderFile"
 uid="uid://06bl528jhp4c"
-path="res://.godot/imported/snow-mipmap.glsl-9f7c71a5a72a538f89ff28c638d850e8.res"
+path="res://.godot/imported/snow-mipmap.glsl-dbe6f0cada237e79bde1587a839f9137.res"
 
 [deps]
 
-source_file="res://snow/compute/snow-mipmap.glsl"
-dest_files=["res://.godot/imported/snow-mipmap.glsl-9f7c71a5a72a538f89ff28c638d850e8.res"]
+source_file="res://Addons/dynamic-interactible-snow/snow/compute/snow-mipmap.glsl"
+dest_files=["res://.godot/imported/snow-mipmap.glsl-dbe6f0cada237e79bde1587a839f9137.res"]
 
 [params]
 

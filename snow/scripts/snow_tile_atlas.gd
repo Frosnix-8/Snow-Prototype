@@ -33,7 +33,7 @@ var mesh_lowmx : PlaneMesh = preload("../../snow/snow meshes/lowestestest-qualit
 
 
 #@onready var snow_curve : CurveTexture = preload("res://snow/snow-compresion-curve-tex.tres")
-@onready var snow_tile : PackedScene = preload("../../snow/scenes/snow-texture-redux.tscn")
+@export var snow_tile : PackedScene
 @export_category("Debug")
 @export var debug_step := false
 @export var debug_print := false

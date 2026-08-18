@@ -3,12 +3,12 @@
 importer="glsl"
 type="RDShaderFile"
 uid="uid://buua7ott3qhru"
-path="res://.godot/imported/snow-noise-generation.glsl-807f44158921516a54588ce64457f18b.res"
+path="res://.godot/imported/snow-noise-generation.glsl-a8ae5e9a986aebff8bbc155e4242d0b1.res"
 
 [deps]
 
-source_file="res://snow/compute/snow-noise-generation.glsl"
-dest_files=["res://.godot/imported/snow-noise-generation.glsl-807f44158921516a54588ce64457f18b.res"]
+source_file="res://Addons/dynamic-interactible-snow/snow/compute/snow-noise-generation.glsl"
+dest_files=["res://.godot/imported/snow-noise-generation.glsl-a8ae5e9a986aebff8bbc155e4242d0b1.res"]
 
 [params]
 
