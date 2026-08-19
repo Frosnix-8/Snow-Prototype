@@ -87,7 +87,7 @@ func get_tiles_in_radius(world_position: Vector3, radius: float) -> Array[Snow_T
 		var dz : float = world_position.z - closest_z
 		if (dx * dx + dz * dz) <= radius * radius:
 			result.append(tile)
-	print("there are ", result.size(), " tiles around the master.")
+	#print("there are ", result.size(), " tiles around the master.")
 	return result
 
 func debug_toggle_snow_storm(rate: float = 0.1) -> void:

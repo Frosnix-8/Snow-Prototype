@@ -6,6 +6,14 @@ enum eventmodes {
 	visual, ##Event does a visual deformation of the snow.
 	logic   ##Event does a logical deformation of snow.
 }
+enum eventtypes {
+	MOVE,
+	STEP,
+	BOOM,
+	ACC_BOOM,
+	COMPRESSION,
+	ACCUMULATION
+}
 static var instance_count : int = 0
 static var instances_updating_collisions_this_frame : int = 0
 static var cached_camera : Camera3D
@@ -424,7 +432,7 @@ func CPU_snow_compression_event_radial(local_uv : Vector2, radius: float, depth 
 	if radius <= 1.55 and !accumulate:
 		radius *= 1.5
 	elif accumulate and radius > 2.0:
-		print("accumulate snow anti-depth is ", depth)
+		#print("accumulate snow anti-depth is ", depth)
 		depth *= 15.0
 	var falloff_radius : float = radius * UV_REDUCTOR_RATIO
 	
@@ -587,7 +595,7 @@ func on_player_step(world_position: Vector3, collision_height : float = -999.0, 
 		depth = clamp((1.0 -((collision_height - sheared_height)) / SNOW_MAX_HEIGHT), 0.0, 1.0)
 		#print("position of snow:",global_position.y)
 		#printt("height of collider:",collision_height)
-		
+	Snowsurfacenetworkmanager.propagate_snow_event(self, eventtypes.STEP, world_position, depth, 0.15)
 	GPU_snow_compression_event(local_uv, 0.15, depth) #adjusted with the new proper sizing.
 	if !visualonly: CPU_queue_event_radial(local_uv, 0.15, depth, world_position)
 	#print("depth is ", depth)
@@ -599,7 +607,7 @@ func on_player_move(world_position: Vector3, collision_height : float = -999, vi
 	if collision_height != -999.0:
 		var sheared_height : float = shear_height_offset(Vector3(world_position.x, global_position.y, world_position.z))
 		depth = clamp((1.0 -((collision_height - sheared_height)) / SNOW_MAX_HEIGHT), 0.0, 0.5)
-		
+	Snowsurfacenetworkmanager.propagate_snow_event(self, eventtypes.MOVE, world_position, depth, 1.5)
 	GPU_snow_compression_event(local_uv, 1.5, depth)
 	if !visualonly: CPU_queue_event_radial(local_uv, 1.5, depth , world_position)
 	#print("depth is ", depth)
@@ -608,28 +616,32 @@ func on_player_move(world_position: Vector3, collision_height : float = -999, vi
 ##Large snow events that will consistently exceed multiple tiles. if using autodepth, input the lowest point of the event, not the center.
 func on_explosion(world_position: Vector3, radius: float, depth: float, autodepth : bool = false) -> void:
 	var mult : float = 1.0 #neighbor tiles lose some height for some reason.
+	Snowsurfacenetworkmanager.propagate_snow_event(self, eventtypes.BOOM, world_position, depth, radius)
 	for tile : Snow_Tile in SnowSurfaceManager.get_tiles_in_radius(world_position, radius):
 		mult = 1.0 if tile == self else 1.12
 		if !autodepth:
-			tile.on_compression_event(world_position, depth * mult, radius, eventmodes.normal, true)
+			tile.on_compression_event(world_position, depth * mult, radius, eventmodes.normal, true, true)
 		elif autodepth:
-			tile.on_compression_event_auto_depth(world_position, depth * mult, radius, eventmodes.normal, true)
+			tile.on_compression_event_auto_depth(world_position, depth * mult, radius, eventmodes.normal, true, true)
 	
 
 
 ##Large snow events that will consistently exceed multiple tiles.
 func on_accumulative_exposion(world_position: Vector3, radius: float, accumulation_intensity : float, _autodepth: bool = false) -> void:
-	print("initiating accumulative explosion")
+	#print("initiating accumulative explosion")
+	Snowsurfacenetworkmanager.propagate_snow_event(self, eventtypes.ACC_BOOM, world_position, accumulation_intensity,radius)
 	for tile: Snow_Tile in SnowSurfaceManager.get_tiles_in_radius(world_position, radius):
-		tile.on_accumulate_event(world_position, radius, accumulation_intensity, false, true)
+		tile.on_accumulate_event(world_position, radius, accumulation_intensity, false, true, true)
 
 #endregion
 
 ##Call for minor events that accumulate snow rather than compress it. accumulation intensity is the percentage of accumulation on the snow per second.
-func on_accumulate_event(world_position: Vector3, radius: float, accumulation_intensity : float = 0.005, visualonly : bool = false, is_large_event : bool = false) -> void:
+func on_accumulate_event(world_position: Vector3, radius: float, accumulation_intensity : float = 0.005, visualonly : bool = false, is_large_event : bool = false, do_not_RPC: bool = false) -> void:
 	var local_uv : Vector2 = world_to_tile_uv(world_position)
 	accumulation_intensity *= get_process_delta_time()
-	print("accumulation intensity is ", accumulation_intensity)
+	#print("accumulation intensity is ", accumulation_intensity)
+	if !do_not_RPC:
+		Snowsurfacenetworkmanager.propagate_snow_event(self, eventtypes.ACCUMULATION, world_position, accumulation_intensity, radius)
 	if !visualonly: 
 		var full_height : float = SNOW_MAX_HEIGHT / CPU_HEIGHTMAP_SCALE
 		var cpu_accumulation_depth : float = accumulation_intensity * full_height
@@ -637,16 +649,19 @@ func on_accumulate_event(world_position: Vector3, radius: float, accumulation_in
 	GPU_snow_accumulation_event(local_uv, radius, accumulation_intensity)
 
 ##Call this when you have just an "event" which doesn't select depth. instead, depth is derived from the lowest point of the event.
-func on_compression_event_auto_depth(world_position : Vector3, collision_height : float, radius: float, mode : eventmodes= eventmodes.normal, disable_propagate: bool = false) -> void:
+func on_compression_event_auto_depth(world_position : Vector3, collision_height : float, radius: float, mode : eventmodes= eventmodes.normal, disable_propagate: bool = false, do_not_RPC: bool = false) -> void:
 	var depth : float
 	var sheared_height : float = shear_height_offset(Vector3(world_position.x, global_position.y, world_position.z))
 	depth = clamp((1.0 -((collision_height - sheared_height)) / SNOW_MAX_HEIGHT), 0.0, 1.0)
-	on_compression_event(world_position, depth * 1.1, radius,mode, disable_propagate)
+	on_compression_event(world_position, depth * 1.1, radius,mode, disable_propagate, do_not_RPC)
 	#CPU_stash_or_use_sce(local_uv, )
 ##Call this when you have an event, where depth is an exact value. a value of 1 means fully compressed snow. enable disable propagate to prevent other tiles from also registering.
 ##Leave mode empty, and disable propagate too. These are developer settings for internal class functions. Bigger events should call on_explosion.
-func on_compression_event(world_position: Vector3 , depth: float, radius : float, mode : eventmodes = eventmodes.normal, disable_propagate : bool = false) -> void:
+func on_compression_event(world_position: Vector3 , depth: float, radius : float, mode : eventmodes = eventmodes.normal, disable_propagate : bool = false, do_not_RPC: bool = false) -> void:
 	var local_uv : Vector2 = world_to_tile_uv(world_position)
+	
+	if !do_not_RPC:
+		Snowsurfacenetworkmanager.propagate_snow_event(self, eventtypes.COMPRESSION, world_position, depth, radius)
 	
 	if mode == eventmodes.visual or mode == eventmodes.normal:
 		GPU_snow_compression_event(local_uv, radius, depth, false)
@@ -817,18 +832,8 @@ static func downsample_max_pool_region(src: PackedFloat32Array, src_size: int, d
 
 	return dst
 	
-func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("ui_accept"):
-
-		on_player_step(Vector3(randf_range(-3,3),0,randf_range(-3,3)))
-			
-		
-	elif event.is_action_pressed("ui_left"):
-		CPU_collision_update()
 
 func _exit_tree() -> void:
-	push_error("tiles exiting the tree force the snow threads to shut down. this is not intended and is purely debug.")
-	SnowSurfaceThreadManager.shutdown()
 	SnowSurfaceManager.remove_tile(self)
 
 func _on_all_tiles_ready() -> void:
