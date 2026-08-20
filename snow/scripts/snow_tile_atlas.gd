@@ -14,6 +14,9 @@ enum eventtypes {
 	COMPRESSION,
 	ACCUMULATION
 }
+
+var tile_id: int
+
 static var instance_count : int = 0
 static var instances_updating_collisions_this_frame : int = 0
 static var cached_camera : Camera3D
@@ -221,6 +224,7 @@ func prepare_shear_transform() -> void:
 func prepare_UV_local() -> void:
 	var index : Vector2i = Vector2i(int(global_position.x / 6 + 8), int(global_position.z / 6 + 8))
 	UV_position = index * UV_RATIO
+	tile_id = index.x * 100000 + index.y
 	if debug_print:
 		print("position is ", UV_position)
 		

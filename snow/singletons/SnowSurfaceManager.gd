@@ -2,7 +2,7 @@ extends Node
 ##Manager of snow surfaces in the game.
 #class_name Snow_Surface_Manager
 signal all_tiles_ready
-
+var tiles_by_id: Dictionary = {}  # String -> Snow_Tile
 var Tiles : Array[Snow_Tile]
 var snow_mat : ShaderMaterial = preload("../../snow/snow meshes/snow-shader-material.tres")
 var blizzard_active : bool = false
@@ -47,13 +47,16 @@ var ticks : int = 0
 
 
 
-func register_tile(tile : Snow_Tile) -> void:
+func register_tile(tile: Snow_Tile) -> void:
 	Tiles.append(tile)
-	all_tiles_ready.connect(tile._on_all_tiles_ready)
+	tiles_by_id[tile.tile_id] = tile
 
-func remove_tile(tile : Snow_Tile) -> void:
+func remove_tile(tile: Snow_Tile) -> void:
 	Tiles.erase(tile)
+	tiles_by_id.erase(tile.tile_id)
 
+func get_tile_by_id(id: int) -> Snow_Tile:
+	return tiles_by_id.get(id, null)
 ##sets to... whatever you choose here. higher is taller snow.
 func reset_all_snow(height: float = 1.0) -> void:
 	print("resetting snow")
