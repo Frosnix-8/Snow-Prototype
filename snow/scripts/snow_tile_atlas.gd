@@ -590,8 +590,9 @@ func shear_height_offset(location : Vector3) -> float:
 
 #region preset movement effects
 
-func on_player_step(world_position: Vector3, collision_height : float = -999.0, visualonly : bool = false) -> void:
+func on_player_step(world_position: Vector3, collision_height : float = -999.0, visualonly : bool = false, do_not_RPC: bool = false) -> void:
 	var local_uv : Vector2 = world_to_tile_uv(world_position)
+	if !do_not_RPC: Snowsurfacenetworkmanager.propagate_snow_event(self, eventtypes.STEP, world_position, collision_height, 0.15)
 	var depth := 0.4
 	if collision_height != -999.0:
 		var sheared_height : float = shear_height_offset(Vector3(world_position.x, global_position.y, world_position.z))
@@ -599,28 +600,29 @@ func on_player_step(world_position: Vector3, collision_height : float = -999.0, 
 		depth = clamp((1.0 -((collision_height - sheared_height)) / SNOW_MAX_HEIGHT), 0.0, 1.0)
 		#print("position of snow:",global_position.y)
 		#printt("height of collider:",collision_height)
-	Snowsurfacenetworkmanager.propagate_snow_event(self, eventtypes.STEP, world_position, depth, 0.15)
+	
 	GPU_snow_compression_event(local_uv, 0.15, depth) #adjusted with the new proper sizing.
 	if !visualonly: CPU_queue_event_radial(local_uv, 0.15, depth, world_position)
 	#print("depth is ", depth)
 	return 
 
-func on_player_move(world_position: Vector3, collision_height : float = -999, visualonly : bool = false) -> void:
+func on_player_move(world_position: Vector3, collision_height : float = -999, visualonly : bool = false,do_not_RPC: bool = false) -> void:
 	var local_uv : Vector2 = world_to_tile_uv(world_position)
 	var depth := 0.4
+	if !do_not_RPC: Snowsurfacenetworkmanager.propagate_snow_event(self, eventtypes.MOVE, world_position, collision_height, 1.5)
 	if collision_height != -999.0:
 		var sheared_height : float = shear_height_offset(Vector3(world_position.x, global_position.y, world_position.z))
 		depth = clamp((1.0 -((collision_height - sheared_height)) / SNOW_MAX_HEIGHT), 0.0, 0.5)
-	Snowsurfacenetworkmanager.propagate_snow_event(self, eventtypes.MOVE, world_position, depth, 1.5)
+	
 	GPU_snow_compression_event(local_uv, 1.5, depth)
 	if !visualonly: CPU_queue_event_radial(local_uv, 1.5, depth , world_position)
 	#print("depth is ", depth)
 	return 
 
 ##Large snow events that will consistently exceed multiple tiles. if using autodepth, input the lowest point of the event, not the center.
-func on_explosion(world_position: Vector3, radius: float, depth: float, autodepth : bool = false) -> void:
+func on_explosion(world_position: Vector3, radius: float, depth: float, autodepth : bool = false, do_not_RPC: bool = false) -> void:
 	var mult : float = 1.0 #neighbor tiles lose some height for some reason.
-	Snowsurfacenetworkmanager.propagate_snow_event(self, eventtypes.BOOM, world_position, depth, radius)
+	if !do_not_RPC: Snowsurfacenetworkmanager.propagate_snow_event(self, eventtypes.BOOM, world_position, depth, radius)
 	for tile : Snow_Tile in SnowSurfaceManager.get_tiles_in_radius(world_position, radius):
 		mult = 1.0 if tile == self else 1.12
 		if !autodepth:
@@ -631,9 +633,9 @@ func on_explosion(world_position: Vector3, radius: float, depth: float, autodept
 
 
 ##Large snow events that will consistently exceed multiple tiles.
-func on_accumulative_exposion(world_position: Vector3, radius: float, accumulation_intensity : float, _autodepth: bool = false) -> void:
+func on_accumulative_exposion(world_position: Vector3, radius: float, accumulation_intensity : float, _autodepth: bool = false,do_not_RPC: bool = false) -> void:
 	#print("initiating accumulative explosion")
-	Snowsurfacenetworkmanager.propagate_snow_event(self, eventtypes.ACC_BOOM, world_position, accumulation_intensity,radius)
+	if !do_not_RPC: Snowsurfacenetworkmanager.propagate_snow_event(self, eventtypes.ACC_BOOM, world_position, accumulation_intensity,radius)
 	for tile: Snow_Tile in SnowSurfaceManager.get_tiles_in_radius(world_position, radius):
 		tile.on_accumulate_event(world_position, radius, accumulation_intensity, false, true, true)
 
@@ -677,7 +679,7 @@ func on_compression_event(world_position: Vector3 , depth: float, radius : float
 
 
 ##Called by other tiles if their compression event is too big for just them. only logic.
-func _on_neightbor_request_compression(world_position: Vector3, depth : float, radius: float, accumulate : bool ) -> void:
+func _on_neightbor_request_compression(world_position: Vector3, depth : float, radius: float, accumulate : bool) -> void:
 	var demi_rad : float = radius / 2.0
 	var max_distance_squared : float = pow(4.24, 2.0) + pow(demi_rad, 2.0)
 	if world_position.distance_squared_to(global_position) > max_distance_squared:
