@@ -12,15 +12,18 @@ var NOISE_SHADER_DEPRACATED : RDShaderFile
 var ACCUMULATE_SHADER : RDShaderFile
 # ------------------------------
 
+## High precision source atlas (R32F, no mips). Stamps write here.
 var atlas_texture : RID
-var atlas_texture_wrapper : Texture2DRD
+## 8-bit mipmapped texture the snow material samples. It interpolates towards the atlas.
 var displayed_atlas_texture : RID
-var displayed_atlas_texture_wrapper : Texture2DRD
+## Created once and never replaced, so materials holding it stay valid.
+var displayed_atlas_texture_wrapper : Texture2DRD = Texture2DRD.new()
 
 var shader : RID
 var pipeline : RID
 var smoothing_shader : RID
 var smoothing_pipeline : RID
+var smoothing_uniform_set : RID
 
 var noise_shader: RID
 var noise_pipeline: RID
@@ -39,34 +42,36 @@ var ambient_accumulation_rate: float = 0.001 # per tick, tune to taste
 
 var mipmap_shader : RID
 var mipmap_pipeline : RID
-
 var displayed_mip_views : Array[RID] = []
+## mip_uniform_sets[i] downsamples mip i into mip i + 1. Built once, since the views never change.
+var mip_uniform_sets : Array[RID] = []
 
-const ATLAS_RESOLUTION : int = 2048
+const ATLAS_RESOLUTION : int = 2048 # keep whatever value you are using now
 const SECT_RESOLUTION  : int = 128
+const MIP_LEVELS : int = 7
 ## Compression uses max blending.
 const OP_MAX_COMPRESS : int = 0
 ## Snow addition uses Accumulative blending.
 const OP_ACCUMULATE : int = 1
+## Frames the smoothing and mip passes keep running after the last change, so the display can converge.
+## Raise it if the displayed snow stops short of the atlas, lower it to save more GPU time.
+const SETTLE_FRAMES : int = 1
 
 var pending_stamps: Array[Dictionary] = []
+var settle_frames_left : int = 0
 
-var smoothing_speed : float = 0.9
-var dampen_factor : float = 15.0  # add near smoothing_speed at top of file
+var smoothing_speed : float = 1.0
+var dampen_factor : float = 15.0
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
-	# --- CORRECTED DYNAMIC PATH PARSING LOGIC ---
-	# 1. Grab the absolute directory location of this exact running script file
 	var base_dir : String = get_script().resource_path.get_base_dir()
-	
-	# 2. Use path_join() and simplify_path() to safely map the relative '..' syntax
+
 	ATLAS_SHADER = load(base_dir.path_join("../../snow/compute/snow-stamp.glsl").simplify_path())
 	SMOOTH_SHADER = load(base_dir.path_join("../../snow/compute/snow-stamp-smooth.glsl").simplify_path())
 	MIPMAP_SHADER = load(base_dir.path_join("../../snow/compute/snow-mipmap.glsl").simplify_path())
 	NOISE_SHADER_DEPRACATED = load(base_dir.path_join("../../snow/compute/snow-noise-generation.glsl").simplify_path())
 	ACCUMULATE_SHADER = load(base_dir.path_join("../../snow/compute/snow-noise-accumulate.glsl").simplify_path())
-	# --- CORRECTED LOGIC END ---
 
 	rd = RenderingServer.get_rendering_device()
 	_compile_shader()
@@ -79,38 +84,47 @@ func _ready() -> void:
 	_create_noise_image()
 	_create_ambient_uniform_set()
 
+## Returns the texture the snow material should sample.
+func get_snow_display_texture() -> Texture2DRD:
+	return displayed_atlas_texture_wrapper
+
 func _compile_shader() -> void:
-	var shader_file: RDShaderFile = ATLAS_SHADER
-	var spirv: RDShaderSPIRV = shader_file.get_spirv()
+	var spirv: RDShaderSPIRV = ATLAS_SHADER.get_spirv()
 	shader = rd.shader_create_from_spirv(spirv)
 	pipeline = rd.compute_pipeline_create(shader)
-	
+
 func _compile_smoothing_shader() -> void:
-	var shader_file: RDShaderFile = SMOOTH_SHADER
-	var spirv: RDShaderSPIRV = shader_file.get_spirv()
+	var spirv: RDShaderSPIRV = SMOOTH_SHADER.get_spirv()
 	smoothing_shader = rd.shader_create_from_spirv(spirv)
 	smoothing_pipeline = rd.compute_pipeline_create(smoothing_shader)
 
 func _compile_mipmap_shader() -> void:
-	var shader_file : RDShaderFile = MIPMAP_SHADER
-	var spirv : RDShaderSPIRV = shader_file.get_spirv()
+	var spirv : RDShaderSPIRV = MIPMAP_SHADER.get_spirv()
 	mipmap_shader = rd.shader_create_from_spirv(spirv)
 	mipmap_pipeline = rd.compute_pipeline_create(mipmap_shader)
 
 func _compile_noise_shader() -> void:
-	var shader_file: RDShaderFile = NOISE_SHADER_DEPRACATED
-	var spirv: RDShaderSPIRV = shader_file.get_spirv()
+	var spirv: RDShaderSPIRV = NOISE_SHADER_DEPRACATED.get_spirv()
 	noise_shader = rd.shader_create_from_spirv(spirv)
 	noise_pipeline = rd.compute_pipeline_create(noise_shader)
 
 func _compile_ambient_shader() -> void:
-	var shader_file: RDShaderFile = ACCUMULATE_SHADER
-	var spirv: RDShaderSPIRV = shader_file.get_spirv()
+	var spirv: RDShaderSPIRV = ACCUMULATE_SHADER.get_spirv()
 	ambient_shader = rd.shader_create_from_spirv(spirv)
 	ambient_pipeline = rd.compute_pipeline_create(ambient_shader)
 
-## Sets up the atlas texture as a black texture with a resolution specified by the constant above.
+## Sets up the source atlas as a black R32F texture. Also safe to call again to reset the snow.
 func _create_atlas(initial_value: float = 0.0) -> void:
+	# Free uniform sets that reference the old atlas BEFORE freeing the atlas itself.
+	if ambient_uniform_set.is_valid():
+		rd.free_rid(ambient_uniform_set)
+		ambient_uniform_set = RID()
+	if smoothing_uniform_set.is_valid():
+		rd.free_rid(smoothing_uniform_set)
+		smoothing_uniform_set = RID()
+	if atlas_texture.is_valid():
+		rd.free_rid(atlas_texture)
+
 	var fmt := RDTextureFormat.new()
 	fmt.width = ATLAS_RESOLUTION
 	fmt.height = ATLAS_RESOLUTION
@@ -122,37 +136,32 @@ func _create_atlas(initial_value: float = 0.0) -> void:
 	)
 
 	var view := RDTextureView.new()
-
-	if ambient_uniform_set.is_valid():
-		rd.free_rid(ambient_uniform_set)
-		ambient_uniform_set = RID()
-
-	if atlas_texture.is_valid():
-		rd.free_rid(atlas_texture)
-
 	atlas_texture = rd.texture_create(fmt, view)
 
 	var initial_data := PackedByteArray()
-	initial_data.resize(ATLAS_RESOLUTION * ATLAS_RESOLUTION * 4) # 4 bytes/pixel, float
-	for i in range(0, initial_data.size(), 4):
-		initial_data.encode_float(i, initial_value)
+	initial_data.resize(ATLAS_RESOLUTION * ATLAS_RESOLUTION * 4) # 4 bytes/pixel. resize() already zero-fills.
+	if initial_value != 0.0:
+		for i in range(0, initial_data.size(), 4):
+			initial_data.encode_float(i, initial_value)
 
 	rd.texture_update(atlas_texture, 0, initial_data)
 
-	if atlas_texture_wrapper == null:
-		atlas_texture_wrapper = Texture2DRD.new()
-
+	# Rebuild everything that references the new atlas.
 	if noise_image_rd.is_valid() and ambient_shader.is_valid():
 		_create_ambient_uniform_set()
-		
+	if displayed_atlas_texture.is_valid():
+		_create_smoothing_uniform_set()
+
+	# The display must catch up with the new atlas contents.
+	settle_frames_left = SETTLE_FRAMES
+
+## Sets up the 8-bit mipmapped texture the material samples. Created once.
 func _create_displayed_atlas() -> void:
 	var fmt := RDTextureFormat.new()
 	fmt.width = ATLAS_RESOLUTION
 	fmt.height = ATLAS_RESOLUTION
 	fmt.format = RenderingDevice.DATA_FORMAT_R8_UNORM
-
-	fmt.set_mipmaps(7)
-
+	fmt.set_mipmaps(MIP_LEVELS)
 	fmt.usage_bits = (
 		RenderingDevice.TEXTURE_USAGE_STORAGE_BIT
 		| RenderingDevice.TEXTURE_USAGE_SAMPLING_BIT
@@ -167,36 +176,26 @@ func _create_displayed_atlas() -> void:
 		return
 
 	var total_size : int = 0
-	for mip in 7:
-		var resolution := ATLAS_RESOLUTION >> mip
-		total_size += resolution * resolution * 1 
+	for mip in MIP_LEVELS:
+		var resolution : int = ATLAS_RESOLUTION >> mip
+		total_size += resolution * resolution
 
 	var initial_data := PackedByteArray()
-	initial_data.resize(total_size)
-	initial_data.fill(0.0)
+	initial_data.resize(total_size) # zero-filled
+	rd.texture_update(displayed_atlas_texture, 0, initial_data)
 
-	rd.texture_update(
-		displayed_atlas_texture,
-		0,
-		initial_data
-	)
-
-	displayed_atlas_texture_wrapper = Texture2DRD.new()
 	displayed_atlas_texture_wrapper.texture_rd_rid = displayed_atlas_texture
 
 	_create_displayed_mip_views()
+	_create_mip_uniform_sets()
+	_create_smoothing_uniform_set()
 
 func _create_displayed_mip_views() -> void:
 	displayed_mip_views.clear()
 
-	if not displayed_atlas_texture.is_valid():
-		push_error("Cannot create mip views: displayed atlas texture is invalid.")
-		return
-
-	for mip in range(7):
+	for mip in range(MIP_LEVELS):
 		var view := RDTextureView.new()
-
-		var mip_texture := rd.texture_create_shared_from_slice(
+		var mip_texture : RID = rd.texture_create_shared_from_slice(
 			view,
 			displayed_atlas_texture,
 			0, # array layer
@@ -204,12 +203,48 @@ func _create_displayed_mip_views() -> void:
 			1, # mip levels exposed by this view
 			RenderingDevice.TEXTURE_SLICE_2D
 		)
-
 		if not mip_texture.is_valid():
 			push_error("Failed to create displayed mip view %d." % mip)
 			continue
-
 		displayed_mip_views.append(mip_texture)
+
+## One uniform set per mip step (mip N-1 -> mip N), built once and reused every frame.
+func _create_mip_uniform_sets() -> void:
+	mip_uniform_sets.clear()
+	if displayed_mip_views.size() != MIP_LEVELS:
+		push_error("Cannot create mip uniform sets: not all mip views were created.")
+		return
+
+	for mip in range(1, MIP_LEVELS):
+		var source_uniform := RDUniform.new()
+		source_uniform.uniform_type = RenderingDevice.UNIFORM_TYPE_IMAGE
+		source_uniform.binding = 0
+		source_uniform.add_id(displayed_mip_views[mip - 1])
+
+		var destination_uniform := RDUniform.new()
+		destination_uniform.uniform_type = RenderingDevice.UNIFORM_TYPE_IMAGE
+		destination_uniform.binding = 1
+		destination_uniform.add_id(displayed_mip_views[mip])
+
+		mip_uniform_sets.append(rd.uniform_set_create([source_uniform, destination_uniform], mipmap_shader, 0))
+
+## Binds atlas (binding 0) and displayed texture (binding 1) for the smoothing pass.
+## Must be rebuilt whenever the atlas is recreated.
+func _create_smoothing_uniform_set() -> void:
+	if smoothing_uniform_set.is_valid():
+		rd.free_rid(smoothing_uniform_set)
+
+	var uniform_target := RDUniform.new()
+	uniform_target.uniform_type = RenderingDevice.UNIFORM_TYPE_IMAGE
+	uniform_target.binding = 0
+	uniform_target.add_id(atlas_texture)
+
+	var uniform_displayed := RDUniform.new()
+	uniform_displayed.uniform_type = RenderingDevice.UNIFORM_TYPE_IMAGE
+	uniform_displayed.binding = 1
+	uniform_displayed.add_id(displayed_atlas_texture)
+
+	smoothing_uniform_set = rd.uniform_set_create([uniform_target, uniform_displayed], smoothing_shader, 0)
 
 func _create_noise_image() -> void:
 	var fmt: RDTextureFormat = RDTextureFormat.new()
@@ -227,7 +262,7 @@ func _create_noise_image() -> void:
 
 	noise_texture_rd = Texture2DRD.new()
 	noise_texture_rd.texture_rd_rid = noise_image_rd
-	
+
 func _create_ambient_uniform_set() -> void:
 	if ambient_uniform_set.is_valid():
 		rd.free_rid(ambient_uniform_set)
@@ -248,79 +283,27 @@ func _create_ambient_uniform_set() -> void:
 		0
 	)
 
+## Downsamples mip N-1 into mip N of the displayed texture, using the cached uniform sets.
 func _generate_atlas_mipmaps() -> void:
-	if displayed_mip_views.size() != 7:
-		push_error("Cannot generate mipmaps: not all mip views were created.")
+	if mip_uniform_sets.size() != MIP_LEVELS - 1:
+		push_error("Cannot generate mipmaps: mip uniform sets were not created.")
 		return
-
-	if not mipmap_pipeline.is_valid():
-		push_error("Mipmap pipeline is invalid.")
-		return
-
-	var uniform_sets: Array[RID] = []
 
 	var list := rd.compute_list_begin()
+	rd.compute_list_bind_compute_pipeline(list, mipmap_pipeline)
 
-	rd.compute_list_bind_compute_pipeline(
-		list,
-		mipmap_pipeline
-	)
+	for mip in range(1, MIP_LEVELS):
+		rd.compute_list_bind_uniform_set(list, mip_uniform_sets[mip - 1], 0)
 
-	for mip in range(1, 7):
-		var source_view: RID = displayed_mip_views[mip - 1]
-		var destination_view: RID = displayed_mip_views[mip]
-
-		if not source_view.is_valid() or not destination_view.is_valid():
-			push_error("Invalid mip view at mip %d." % mip)
-			continue
-
-		var source_uniform := RDUniform.new()
-		source_uniform.uniform_type = RenderingDevice.UNIFORM_TYPE_IMAGE
-		source_uniform.binding = 0
-		source_uniform.add_id(source_view)
-
-		var destination_uniform := RDUniform.new()
-		destination_uniform.uniform_type = RenderingDevice.UNIFORM_TYPE_IMAGE
-		destination_uniform.binding = 1
-		destination_uniform.add_id(destination_view)
-
-		var uniform_set := rd.uniform_set_create(
-			[source_uniform, destination_uniform],
-			mipmap_shader,
-			0
-		)
-
-		if not uniform_set.is_valid():
-			push_error("Failed to create mipmap uniform set for mip %d." % mip)
-			continue
-
-		uniform_sets.append(uniform_set)
-
-		rd.compute_list_bind_uniform_set(
-			list,
-			uniform_set,
-			0
-		)
-
-		var size: int = ATLAS_RESOLUTION >> mip
-		var groups: int = int(float(size) / 8.0)
-
-		rd.compute_list_dispatch(
-			list,
-			groups,
-			groups,
-			1
-		)
+		@warning_ignore("integer_division")
+		var groups: int = (ATLAS_RESOLUTION >> mip) / 8
+		rd.compute_list_dispatch(list, groups, groups, 1)
 
 		# Make the destination mip visible to the next dispatch.
 		rd.compute_list_add_barrier(list)
 
 	rd.compute_list_end()
 
-	for uniform_set in uniform_sets:
-		if uniform_set.is_valid():
-			rd.free_rid(uniform_set)
-			
 func generate_noise_map(seed_value: int, frequency: float = 0.01) -> void:
 	current_seed = seed_value
 	current_frequency = frequency
@@ -350,62 +333,87 @@ func generate_noise_map(seed_value: int, frequency: float = 0.01) -> void:
 	rd.compute_list_end()
 	noise_ready = true
 
-
 # Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(delta: float) -> void:
-	if pending_stamps.is_empty():
-		_ambient_accumulate_step(delta)
-		_smooth_atlas_step(delta)
-		_generate_atlas_mipmaps()
+	if not pending_stamps.is_empty():
+		_apply_pending_stamps()
+		settle_frames_left = SETTLE_FRAMES
+
+	_ambient_accumulate_step(delta)
+	if ambient_accumulation_enabled:
+		settle_frames_left = SETTLE_FRAMES
+
+	# Idle and settled: the displayed texture already matches the atlas, so skip both passes.
+	if settle_frames_left <= 0:
 		return
-	
+	settle_frames_left -= 1
+
+	_smooth_atlas_step(delta)
+	_generate_atlas_mipmaps()
+
+## Uploads all pending stamps once, then runs one small dispatch per stamp over its bounding box.
+func _apply_pending_stamps() -> void:
 	var stamp_bytes: PackedByteArray = _pack_stamps(pending_stamps)
-	var stamp_buffer : RID = rd.storage_buffer_create(stamp_bytes.size(), stamp_bytes)
-	
+	var stamp_buffer: RID = rd.storage_buffer_create(stamp_bytes.size(), stamp_bytes)
+
 	var atlas_uniform := RDUniform.new()
 	atlas_uniform.uniform_type = RenderingDevice.UNIFORM_TYPE_IMAGE
 	atlas_uniform.binding = 0
 	atlas_uniform.add_id(atlas_texture)
-	
+
 	var stamp_uniform := RDUniform.new()
 	stamp_uniform.uniform_type = RenderingDevice.UNIFORM_TYPE_STORAGE_BUFFER
 	stamp_uniform.binding = 1
 	stamp_uniform.add_id(stamp_buffer)
-	
-	var uniform_set : RID = rd.uniform_set_create([atlas_uniform, stamp_uniform], shader, 0)
-	
-	var push_constant: PackedByteArray = PackedByteArray()
-	push_constant.resize(4)
-	push_constant.encode_s32(0, pending_stamps.size())
-	
+
+	var uniform_set: RID = rd.uniform_set_create([atlas_uniform, stamp_uniform], shader, 0)
+
 	var list: int = rd.compute_list_begin()
 	rd.compute_list_bind_compute_pipeline(list, pipeline)
 	rd.compute_list_bind_uniform_set(list, uniform_set, 0)
-	rd.compute_list_set_push_constant(list, push_constant, push_constant.size())
-	#print("snow computer is dispatching the compute shader.")
-	@warning_ignore("integer_division")
-	rd.compute_list_dispatch(list, ATLAS_RESOLUTION / 8, ATLAS_RESOLUTION / 8, 1)
+
+	for i: int in pending_stamps.size():
+		var stamp: Dictionary = pending_stamps[i]
+		var uv: Vector2 = stamp[&"uv"]
+		var radius_px: float = stamp[&"radius"] * float(ATLAS_RESOLUTION)
+		var center_px: Vector2 = uv * float(ATLAS_RESOLUTION)
+
+		# Bounding box in pixels, clamped to the atlas.
+		var min_x: int = maxi(0, int(floor(center_px.x - radius_px)))
+		var min_y: int = maxi(0, int(floor(center_px.y - radius_px)))
+		var max_x: int = mini(ATLAS_RESOLUTION - 1, int(ceil(center_px.x + radius_px)))
+		var max_y: int = mini(ATLAS_RESOLUTION - 1, int(ceil(center_px.y + radius_px)))
+
+		var width: int = max_x - min_x + 1
+		var height: int = max_y - min_y + 1
+		if width <= 0 or height <= 0:
+			continue # stamp is entirely outside the atlas
+
+		var push_constant: PackedByteArray = PackedByteArray()
+		push_constant.resize(16)
+		push_constant.encode_s32(0, min_x)
+		push_constant.encode_s32(4, min_y)
+		push_constant.encode_s32(8, i)
+		push_constant.encode_s32(12, 0)
+		rd.compute_list_set_push_constant(list, push_constant, push_constant.size())
+
+		# Round up to whole 8x8 groups. The shader guards the overshoot.
+		@warning_ignore("integer_division")
+		rd.compute_list_dispatch(list, (width + 7) / 8, (height + 7) / 8, 1)
+
+		# Make this stamp's writes visible before the next stamp reads the same pixels.
+		rd.compute_list_add_barrier(list)
+
 	rd.compute_list_end()
-	
+
 	rd.free_rid(uniform_set)
 	rd.free_rid(stamp_buffer)
 	pending_stamps.clear()
-	
-	_ambient_accumulate_step(delta)
-	_smooth_atlas_step(delta)
-	_generate_atlas_mipmaps()
-func _smooth_atlas_step(delta) -> void:
-	var uniform_target := RDUniform.new()
-	uniform_target.uniform_type = RenderingDevice.UNIFORM_TYPE_IMAGE
-	uniform_target.binding = 0
-	uniform_target.add_id(atlas_texture)
 
-	var uniform_displayed := RDUniform.new()
-	uniform_displayed.uniform_type = RenderingDevice.UNIFORM_TYPE_IMAGE
-	uniform_displayed.binding = 1
-	uniform_displayed.add_id(displayed_atlas_texture)
-
-	var uniform_set : RID = rd.uniform_set_create([uniform_target, uniform_displayed], smoothing_shader, 0)
+## Interpolates the displayed texture towards the atlas, using the cached uniform set.
+func _smooth_atlas_step(delta: float) -> void:
+	if not smoothing_uniform_set.is_valid():
+		return
 
 	var frame_speed : float = 1.0 - pow(1.0 - smoothing_speed, delta * 60.0)
 
@@ -416,13 +424,11 @@ func _smooth_atlas_step(delta) -> void:
 
 	var list := rd.compute_list_begin()
 	rd.compute_list_bind_compute_pipeline(list, smoothing_pipeline)
-	rd.compute_list_bind_uniform_set(list, uniform_set, 0)
+	rd.compute_list_bind_uniform_set(list, smoothing_uniform_set, 0)
 	rd.compute_list_set_push_constant(list, push_constant, push_constant.size())
 	@warning_ignore("integer_division")
 	rd.compute_list_dispatch(list, ATLAS_RESOLUTION / 8, ATLAS_RESOLUTION / 8, 1)
 	rd.compute_list_end()
-
-	rd.free_rid(uniform_set)
 
 func _ambient_accumulate_step(delta: float) -> void:
 	if not ambient_accumulation_enabled:
@@ -436,23 +442,15 @@ func _ambient_accumulate_step(delta: float) -> void:
 	push_constant.encode_float(0, ambient_accumulation_rate * delta)
 
 	var list := rd.compute_list_begin()
-
 	rd.compute_list_bind_compute_pipeline(list, ambient_pipeline)
 	rd.compute_list_bind_uniform_set(list, ambient_uniform_set, 0)
 	rd.compute_list_set_push_constant(list, push_constant, push_constant.size())
 
 	@warning_ignore("integer_division")
-	rd.compute_list_dispatch(
-		list,
-		ATLAS_RESOLUTION / 8,
-		ATLAS_RESOLUTION / 8,
-		1
-	)
+	rd.compute_list_dispatch(list, ATLAS_RESOLUTION / 8, ATLAS_RESOLUTION / 8, 1)
 
 	rd.compute_list_add_barrier(list)
 	rd.compute_list_end()
-	#print("accumulation is cooking")
-	
 
 func request_stamp(atlas_uv : Vector2, radius_uv: float, value: float, operation: int = OP_MAX_COMPRESS) -> void:
 	pending_stamps.append({
@@ -461,10 +459,7 @@ func request_stamp(atlas_uv : Vector2, radius_uv: float, value: float, operation
 		&"value" : value,
 		&"operation" : operation
 	})
-	#if operation == OP_ACCUMULATE:
-		#print("for some reason we need to accumulate")
-	#print("snow computer received request for a stamp from snow.")
-	
+
 func _pack_stamps(stamps: Array[Dictionary]) -> PackedByteArray:
 	var bytes : PackedByteArray = PackedByteArray()
 	bytes.resize(stamps.size() * 24)
@@ -476,16 +471,13 @@ func _pack_stamps(stamps: Array[Dictionary]) -> PackedByteArray:
 		bytes.encode_float(offset + 8, stamp[&"radius"])
 		bytes.encode_float(offset + 12, stamp[&"value"])
 		bytes.encode_u32(offset + 16, stamp[&"operation"])
-		bytes.encode_u32(offset + 20, 0) #padding lol
-		
+		bytes.encode_u32(offset + 20, 0) # padding
 		offset += 24
-	#print("snow computer is packing stamps into a byte array.")
 	return bytes
-	
+
 func _exit_tree() -> void:
 	if rd:
 		rd.free_rid(noise_uniform_set)
 		rd.free_rid(noise_image_rd)
 		rd.free_rid(noise_pipeline)
 		rd.free_rid(noise_shader)
-	

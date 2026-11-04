@@ -9,6 +9,7 @@ enum eventmodes {
 static var instance_count : int = 0
 static var instances_updating_collisions_this_frame : int = 0
 static var cached_camera : Camera3D
+
 var cached_distance_to_cam : float
 const MAX_COLLISION_UPDATES_PER_FRAME : int = 32
 const TILE_TEXTURE_RESOLUTION : int = 128
@@ -158,11 +159,12 @@ func _physics_process(delta: float) -> void:
 		CPU_important_update = false
 
 	if ticks % collision_update_ratio == 0 and collisions_changed == true:
+		ticks = 0
 		if !use_thread:
 			CPU_heightmap_create_low_synchronous()
 		var tries : int = 0
 		while instances_updating_collisions_this_frame >= MAX_COLLISION_UPDATES_PER_FRAME and tries < 9:
-			print("deferring collisions update")
+			#print("deferring collisions update")
 			await get_tree().physics_frame
 		
 		CPU_collision_update.call_deferred()
@@ -236,6 +238,7 @@ func prepare_material_UV() -> void:
 static var material_setup : bool = false
 static func prepare_material_static() -> void:
 	if material_setup == false:
+		print("set snow")
 		snow_mesh_material.set_shader_parameter("snow_tex", SnowComputeManager.displayed_atlas_texture_wrapper)
 		
 		snow_mesh_material.set_shader_parameter("max_height", SNOW_MAX_HEIGHT)
@@ -249,11 +252,12 @@ func prepare_collisions() -> void:
 	coliision.shape = shape
 
 func prepare_neighbors() -> void:
-	var pos : Vector3i = global_position.round()
+	print("preparing neighbors.")
+	var pos : Vector3i = position.round()
 	for x : Snow_Tile in SnowSurfaceManager.Tiles:
 		if x == self:
 			continue
-		var xpos : Vector3i = x.global_position.round()
+		var xpos : Vector3i = x.position.round()
 		var delta : Vector3i = pos - xpos
 		
 		var x_neightbor : bool = absi(delta.x) <= 6
@@ -380,7 +384,7 @@ static func CPU_workerthread_compute_pending_events(user : Snow_Tile) -> void:
 
 ##Notes into a queue the pending snow events if threading is enabled. this queue is then handled by dedicated threads and translated into the CPU collision array.
 func CPU_queue_event_radial(local_uv : Vector2, radius: float, depth : float, global_pos : Vector3 = Vector3.ZERO,  disable_propagate: bool = false, accumulate : bool = false) -> void:
-	
+	#print("event at ", global_pos)
 	if use_thread:
 		CPU_grid_thread_mutex_instance_queue.lock()
 		queued_events.append({
@@ -402,6 +406,7 @@ func CPU_queue_event_radial(local_uv : Vector2, radius: float, depth : float, gl
 	
 	if exceeds_current_tile(radius, local_uv):
 		#print("tile needs propagation")
+		#print("has ", snow_tile_neightbors.size(), " neighbors")
 		for x : Snow_Tile in snow_tile_neightbors:
 			#print("this tile has ", snow_tile_neightbors.size(), " neighbors")
 			x._on_neightbor_request_compression(global_pos, depth, radius ,accumulate)
@@ -424,7 +429,7 @@ func CPU_snow_compression_event_radial(local_uv : Vector2, radius: float, depth 
 	if radius <= 1.55 and !accumulate:
 		radius *= 1.5
 	elif accumulate and radius > 2.0:
-		print("accumulate snow anti-depth is ", depth)
+		#print("accumulate snow anti-depth is ", depth)
 		depth *= 15.0
 	var falloff_radius : float = radius * UV_REDUCTOR_RATIO
 	
@@ -499,14 +504,14 @@ func CPU_heightmap_create_low(user :Snow_Tile) -> void:
 	user.CPU_collision_update()
 ##resets heightmaps to whatever. should be threaded if final.
 func TMP_CPU_heightmap_reset(value : float) -> void:
-	print("value is ", value)
+	#print("value is ", value)
 	value = (SNOW_MAX_HEIGHT/ CPU_HEIGHTMAP_SCALE) * (1.0 - value) * 1
-	print("calculated value is ", value)
+	#print("calculated value is ", value)
 	#if thread_started:
 		#while WorkerThreadPool.is_task_completed(CPU_workerthread_task_id) == false:
 			#await get_tree().physics_frame
 	collisions_changed = true
-	print("resetting CPU array")
+	#print("resetting CPU array")
 	snow_map_CPU.fill(value)
 	pending_blizzard_accumulation = 0.0
 	snow_map_CPU_reduced.fill(value)
@@ -588,20 +593,21 @@ func on_player_step(world_position: Vector3, collision_height : float = -999.0, 
 		#print("position of snow:",global_position.y)
 		#printt("height of collider:",collision_height)
 		
-	GPU_snow_compression_event(local_uv, 0.15, depth) #adjusted with the new proper sizing.
-	if !visualonly: CPU_queue_event_radial(local_uv, 0.15, depth, world_position)
+	GPU_snow_compression_event(local_uv, 0.7, depth) #adjusted with the new proper sizing.
+	if !visualonly: CPU_queue_event_radial(local_uv, 0.7, depth, world_position)
 	#print("depth is ", depth)
 	return 
 
-func on_player_move(world_position: Vector3, collision_height : float = -999, visualonly : bool = false) -> void:
+func on_player_move(world_position: Vector3, collision_height : float = -999, visualonly : bool = false, disable_limit : bool = false) -> void:
 	var local_uv : Vector2 = world_to_tile_uv(world_position)
-	var depth := 0.4
+	var depth := 2.0
 	if collision_height != -999.0:
+		#depth += global_position.y - collision_height
+		var limit = 0.85 if disable_limit else 0.5
 		var sheared_height : float = shear_height_offset(Vector3(world_position.x, global_position.y, world_position.z))
-		depth = clamp((1.0 -((collision_height - sheared_height)) / SNOW_MAX_HEIGHT), 0.0, 0.5)
-		
-	GPU_snow_compression_event(local_uv, 1.5, depth)
-	if !visualonly: CPU_queue_event_radial(local_uv, 1.5, depth , world_position)
+		depth = clamp((1.0 -((collision_height - (sheared_height -0.5))) / SNOW_MAX_HEIGHT), 0.0, limit)
+	GPU_snow_compression_event(local_uv, 1.7, depth)
+	if !visualonly: CPU_queue_event_radial(local_uv, 1.7, depth , world_position)
 	#print("depth is ", depth)
 	return 
 
@@ -619,7 +625,7 @@ func on_explosion(world_position: Vector3, radius: float, depth: float, autodept
 
 ##Large snow events that will consistently exceed multiple tiles.
 func on_accumulative_exposion(world_position: Vector3, radius: float, accumulation_intensity : float, _autodepth: bool = false) -> void:
-	print("initiating accumulative explosion")
+	#print("initiating accumulative explosion")
 	for tile: Snow_Tile in SnowSurfaceManager.get_tiles_in_radius(world_position, radius):
 		tile.on_accumulate_event(world_position, radius, accumulation_intensity, false, true)
 
@@ -629,14 +635,20 @@ func on_accumulative_exposion(world_position: Vector3, radius: float, accumulati
 func on_accumulate_event(world_position: Vector3, radius: float, accumulation_intensity : float = 0.005, visualonly : bool = false, is_large_event : bool = false) -> void:
 	var local_uv : Vector2 = world_to_tile_uv(world_position)
 	accumulation_intensity *= get_process_delta_time()
-	print("accumulation intensity is ", accumulation_intensity)
+	#print("accumulation intensity is ", accumulation_intensity)
 	if !visualonly: 
+		
 		var full_height : float = SNOW_MAX_HEIGHT / CPU_HEIGHTMAP_SCALE
-		var cpu_accumulation_depth : float = accumulation_intensity * full_height
-		CPU_queue_event_radial(local_uv, radius, cpu_accumulation_depth, world_position, is_large_event, true)
+		var cpu_accumulation_depth : float = accumulation_intensity * full_height * 2.55
+		var cpu_radius := radius
+		if accumulation_intensity > 1.0:
+			cpu_accumulation_depth *= 0.001
+			cpu_radius = radius - 1.0
+		CPU_queue_event_radial(local_uv, cpu_radius, cpu_accumulation_depth, world_position, is_large_event, true)
 	GPU_snow_accumulation_event(local_uv, radius, accumulation_intensity)
 
 ##Call this when you have just an "event" which doesn't select depth. instead, depth is derived from the lowest point of the event.
+@rpc("any_peer","call_local","reliable")
 func on_compression_event_auto_depth(world_position : Vector3, collision_height : float, radius: float, mode : eventmodes= eventmodes.normal, disable_propagate: bool = false) -> void:
 	var depth : float
 	var sheared_height : float = shear_height_offset(Vector3(world_position.x, global_position.y, world_position.z))
@@ -816,29 +828,20 @@ static func downsample_max_pool_region(src: PackedFloat32Array, src_size: int, d
 			dst[index] = clamp(best, 0.0, full_height)
 
 	return dst
-	
-func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("ui_accept"):
 
-		on_player_step(Vector3(randf_range(-3,3),0,randf_range(-3,3)))
-			
-		
-	elif event.is_action_pressed("ui_left"):
-		CPU_collision_update()
 
 func _exit_tree() -> void:
-	push_error("tiles exiting the tree force the snow threads to shut down. this is not intended and is purely debug.")
-	SnowSurfaceThreadManager.shutdown()
+
 	SnowSurfaceManager.remove_tile(self)
 
 func _on_all_tiles_ready() -> void:
-	print("got tile ready!!!")
+	#print("got tile ready!!!")
 	prepare_neighbors()
 ##Creates a 96x96 meter region filled with snow. this is the current largest possible snow region available due to space constraints. 
 ##Any bigger will cause UV boundary issues and not retain information.
 func debug_propagate() -> void:
 	if debug_propagate_large_area:
-		print("PROPAGATING INTO LARGE AREA")
+		#print("PROPAGATING INTO LARGE AREA")
 		var amount := 16
 		for x in range(amount):
 			for y in range(amount):

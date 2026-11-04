@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://ckal2isr0gx37"
+path="res://.godot/imported/snow-mipmap-r32f.glsl-473a858ba371cf4be01c4df0ca14a497.res"
+
+[deps]
+
+source_file="res://addons/dynamic-interactible-snow/snow/compute/snow-mipmap-r32f.glsl"
+dest_files=["res://.godot/imported/snow-mipmap-r32f.glsl-473a858ba371cf4be01c4df0ca14a497.res"]
+
+[params]
+

@@ -3,8 +3,8 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://c5uqidb3sq634"
-path.s3tc="res://.godot/imported/snow2knormal.png-e8feea48dd6d87d97e3d58c0cf90623d.s3tc.ctex"
-path.etc2="res://.godot/imported/snow2knormal.png-e8feea48dd6d87d97e3d58c0cf90623d.etc2.ctex"
+path.s3tc="res://.godot/imported/snow2knormal.png-21a2a3351e1d557b5edc75f097bb510d.s3tc.ctex"
+path.etc2="res://.godot/imported/snow2knormal.png-21a2a3351e1d557b5edc75f097bb510d.etc2.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
@@ -12,8 +12,8 @@ metadata={
 
 [deps]
 
-source_file="res://Addons/dynamic-interactible-snow/snow/textures/snow2knormal.png"
-dest_files=["res://.godot/imported/snow2knormal.png-e8feea48dd6d87d97e3d58c0cf90623d.s3tc.ctex", "res://.godot/imported/snow2knormal.png-e8feea48dd6d87d97e3d58c0cf90623d.etc2.ctex"]
+source_file="res://addons/dynamic-interactible-snow/snow/textures/snow2knormal.png"
+dest_files=["res://.godot/imported/snow2knormal.png-21a2a3351e1d557b5edc75f097bb510d.s3tc.ctex", "res://.godot/imported/snow2knormal.png-21a2a3351e1d557b5edc75f097bb510d.etc2.ctex"]
 
 [params]
 
