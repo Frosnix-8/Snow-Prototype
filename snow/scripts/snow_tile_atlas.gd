@@ -17,7 +17,8 @@ const ATLAS_TEXTURE_RESOLUTION : int = 2048
 const CPU_HEIGHTMAP_RESOLUTION : int = 32
 const CPU_HEIGHTMAP_RESOLUTION_REDUCED : int = 13
 const CPU_HEIGHTMAP_SCALE : float = 0.5
-
+##LOD level at which shadows are not rendered for the tiles.
+static var SHADOW_quality : int = 3
 var CPU_grid_thread_mutex_instance_queue : Mutex = Mutex.new()
 var CPU_grid_thread_mutex_instance:Mutex = Mutex.new()
 
@@ -304,6 +305,10 @@ func LOD_mesh_update() -> void:
 		5: mesh = mesh_lowmx  #no quality at all.
 		#most of the higher LOD values really only exist for low resolution, where having tiny LODs kinda matter when the pixelation makes that you 
 		#can't see more than 30 meters in HD.
+	if LOD >= SHADOW_quality:
+		snow_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	else:
+		snow_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	snow_mesh.mesh = mesh
 	#print("did some LOD stuff")
 	snow_mesh.set_instance_shader_parameter("lod_level", LOD)

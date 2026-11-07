@@ -119,4 +119,6 @@ func deactivate_snow_storm() -> void:
 	SnowComputeManager.ambient_accumulation_enabled = false
 	if multiplayer.has_multiplayer_peer() and is_multiplayer_authority():
 		deactivate_snow_storm.rpc()
-		
+
+func set_shadow_quality(level : int = 3) -> void:
+	Snow_Tile.SHADOW_quality = level
